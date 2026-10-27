@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Player } from '@svelteframe/core';
+	import AsyncDemo, { config as asyncConfig } from '#lib/compositions/AsyncDemo.svelte';
 	import Primitives, { config } from '#lib/compositions/Primitives.svelte';
 </script>
 
@@ -13,6 +14,13 @@
 	<p>
 		<code>spring</code>, <code>Series</code>, <code>Loop</code>, <code>Freeze</code> and
 		<code>random</code> · <a href="/">Back to the intro video</a>
+	</p>
+
+	<h1>Async demo</h1>
+	<Player component={AsyncDemo} {...asyncConfig} />
+	<p>
+		<code>Img</code> and <code>delayRender</code>. Rendered with
+		<code>/render/async</code>, every frame waits for its image and data.
 	</p>
 </main>
 
