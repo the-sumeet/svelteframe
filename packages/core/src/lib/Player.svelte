@@ -1,6 +1,7 @@
 <script lang="ts" generics="P extends Record<string, any> = Record<string, never>">
 	import { untrack, type Component } from 'svelte';
 	import Composition from './Composition.svelte';
+	import { setPlayback } from './environment.js';
 	import { formatTimecode } from './timecode.js';
 	import { VideoState } from './video.svelte.js';
 
@@ -36,6 +37,12 @@
 
 	// svelte-ignore state_referenced_locally
 	let playing = $state(autoplay);
+	// Lets <Audio> follow play/pause.
+	setPlayback({
+		get playing() {
+			return playing;
+		}
+	});
 	let boxWidth = $state(0);
 	const scale = $derived(boxWidth > 0 ? boxWidth / width : 1);
 

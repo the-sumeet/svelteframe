@@ -1,4 +1,14 @@
 export { default as AbsoluteFill } from './AbsoluteFill.svelte';
+export { default as Audio } from './Audio.svelte';
+export {
+	AudioRecorder,
+	createAudioRecorder,
+	getAudioManifest,
+	resetAudioManifest,
+	type AudioRecorderOptions,
+	type AudioSegment,
+	type Observation
+} from './audio.js';
 export { default as Composition } from './Composition.svelte';
 export {
 	defineComposition,
@@ -26,6 +36,14 @@ export {
 	type RenderHandle
 } from './delay-render.js';
 export { Easing, type EasingFunction } from './easing.js';
+export {
+	setPlayback,
+	setRenderMode,
+	usePlayback,
+	useRenderMode,
+	type Playback,
+	type RenderMode
+} from './environment.js';
 export { interpolate, type ExtrapolateType, type InterpolateOptions } from './interpolate.js';
 export { decodeProps, encodeProps } from './props.js';
 export { random } from './random.js';

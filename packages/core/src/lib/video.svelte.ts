@@ -9,6 +9,8 @@ export interface VideoConfig {
 
 export interface VideoContext extends VideoConfig {
 	readonly frame: number;
+	/** The composition's current frame, unaffected by Sequence, Loop or Freeze remapping. */
+	readonly absoluteFrame: number;
 }
 
 export class VideoState implements VideoContext {
@@ -24,6 +26,10 @@ export class VideoState implements VideoContext {
 		this.height = config.height;
 		this.durationInFrames = config.durationInFrames;
 	}
+
+	get absoluteFrame(): number {
+		return this.frame;
+	}
 }
 
 /**
@@ -38,6 +44,9 @@ export function createChildVideo(
 	return {
 		get frame() {
 			return frame();
+		},
+		get absoluteFrame() {
+			return parent.absoluteFrame;
 		},
 		get fps() {
 			return parent.fps;
