@@ -1,5 +1,15 @@
 export { default as AbsoluteFill } from './AbsoluteFill.svelte';
 export { default as Composition } from './Composition.svelte';
+export {
+	defineComposition,
+	resolveComposition,
+	type AnyComposition,
+	type CalculateMetadataArgs,
+	type CompositionConfig,
+	type CompositionDefinition,
+	type CompositionMetadata,
+	type ResolvedComposition
+} from './composition.js';
 export { default as Freeze } from './Freeze.svelte';
 export { default as Img } from './Img.svelte';
 export { default as Loop } from './Loop.svelte';
@@ -17,6 +27,7 @@ export {
 } from './delay-render.js';
 export { Easing, type EasingFunction } from './easing.js';
 export { interpolate, type ExtrapolateType, type InterpolateOptions } from './interpolate.js';
+export { decodeProps, encodeProps } from './props.js';
 export { random } from './random.js';
 export {
 	defaultSpringConfig,

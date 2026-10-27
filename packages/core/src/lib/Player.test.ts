@@ -4,6 +4,7 @@ import { flushSync } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Player from './Player.svelte';
 import PlayerProbe from './PlayerProbe.test.svelte';
+import PropsProbe from './PropsProbe.test.svelte';
 
 const base = { component: PlayerProbe, fps: 30, width: 320, height: 180, durationInFrames: 90 };
 const probe = () => Number(screen.getByTestId('probe').textContent);
@@ -98,6 +99,25 @@ describe('Player', () => {
 		await fireEvent.click(screen.getByRole('button', { name: 'Play' }));
 		expect(probe()).toBe(0);
 		expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy();
+	});
+
+	it('passes inputProps to the root component', () => {
+		render(Player, {
+			...base,
+			component: PropsProbe,
+			inputProps: { title: 'Hello', count: 3 }
+		});
+		expect(screen.getByTestId('probe').textContent).toBe('Hello|3|0');
+	});
+
+	it('updates the root component when inputProps change', async () => {
+		const { rerender } = render(Player, {
+			...base,
+			component: PropsProbe,
+			inputProps: { title: 'One', count: 1 }
+		});
+		await rerender({ ...base, component: PropsProbe, inputProps: { title: 'Two', count: 2 } });
+		expect(screen.getByTestId('probe').textContent).toBe('Two|2|0');
 	});
 
 	it('toggles playback when the stage is clicked', async () => {

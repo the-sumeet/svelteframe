@@ -1,4 +1,4 @@
-<script lang="ts">
+<script lang="ts" generics="P extends Record<string, any> = Record<string, never>">
 	import { untrack, type Component } from 'svelte';
 	import Composition from './Composition.svelte';
 	import { formatTimecode } from './timecode.js';
@@ -6,7 +6,9 @@
 
 	interface Props {
 		/** Root component of the video; it reads the frame via `useVideo()`. */
-		component: Component;
+		component: Component<P>;
+		/** Props passed to `component`. */
+		inputProps?: P;
 		fps: number;
 		width: number;
 		height: number;
@@ -18,6 +20,7 @@
 
 	let {
 		component: Root,
+		inputProps,
 		fps,
 		width,
 		height,
@@ -114,7 +117,7 @@
 		>
 			{#key video}
 				<Composition {video}>
-					<Root />
+					<Root {...inputProps as P} />
 				</Composition>
 			{/key}
 		</div>
