@@ -1,12 +1,24 @@
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { renderVideo, type RenderProgress } from './render.js';
+import { assertProps, buildRenderUrl } from './url.js';
 
-const USAGE = `Usage: tsx src/cli.ts --url <url> [--out out.mp4] [--png] [--quality 90] [--chromium <path>]`;
+const USAGE = `Usage:
+  tsx src/cli.ts --url <page url> [options]
+  tsx src/cli.ts --url <base url> --composition <id> [--props props.json] [options]
+
+Options:
+  --out <file>          output file (default out.mp4)
+  --png                 capture PNG frames instead of JPEG
+  --quality <0-100>     JPEG quality (default 90)
+  --chromium <path>     Chromium executable to use`;
 
 const { values } = parseArgs({
 	options: {
 		url: { type: 'string' },
+		composition: { type: 'string' },
+		props: { type: 'string' },
 		out: { type: 'string', default: 'out.mp4' },
 		png: { type: 'boolean', default: false },
 		quality: { type: 'string', default: '90' },
@@ -27,7 +39,27 @@ if (!Number.isFinite(quality) || quality < 0 || quality > 100) {
 }
 
 // `pnpm exec` runs from the package directory; resolve paths from where the user ran it.
-const output = resolve(process.env.INIT_CWD ?? process.cwd(), values.out!);
+const cwd = process.env.INIT_CWD ?? process.cwd();
+const output = resolve(cwd, values.out!);
+
+let pageUrl: string;
+try {
+	let props;
+	if (values.props !== undefined) {
+		const file = resolve(cwd, values.props);
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(await readFile(file, 'utf8'));
+		} catch (err) {
+			throw new Error(`Could not read props from ${file}: ${(err as Error).message}`);
+		}
+		props = assertProps(parsed, file);
+	}
+	pageUrl = buildRenderUrl({ url: values.url, composition: values.composition, props });
+} catch (err) {
+	console.error(err instanceof Error ? err.message : err);
+	process.exit(1);
+}
 
 const controller = new AbortController();
 process.once('SIGINT', () => {
@@ -42,7 +74,7 @@ const line = (p: RenderProgress) =>
 
 try {
 	const result = await renderVideo({
-		url: values.url,
+		url: pageUrl,
 		output,
 		imageFormat: values.png ? 'png' : 'jpeg',
 		quality,

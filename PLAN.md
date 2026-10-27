@@ -112,7 +112,7 @@ Verify: open `/render?frame=0`, `/render?frame=45`, `/render?frame=120` and conf
   4. Spawn ffmpeg: `-y -f image2pipe -c:v mjpeg -framerate <fps> -i - -c:v libx264 -pix_fmt yuv420p <output>` (use `-c:v png` input when `imageFormat='png'`).
   5. For each frame: `setFrame(f)` → `page.screenshot({ type, quality })` → write to ffmpeg stdin respecting backpressure (`drain`).
   6. Close stdin, await ffmpeg exit code 0 (reject with captured stderr otherwise), close browser.
-- `cli.ts` — `tsx src/cli.ts --url http://localhost:5173/render --out out.mp4`; prints progress `frame x/y` and elapsed time / fps.
+- `cli.ts` — `tsx src/cli.ts --url http://localhost:5173/render/main --out out.mp4`; prints progress `frame x/y` and elapsed time / fps. (Milestone 7 adds `--composition <id> --props <file>`, which build that URL from a base URL.)
 - Clean up browser + ffmpeg on error and on SIGINT.
 
 Verify: with playground dev server running, `pnpm render` produces `out.mp4`; `ffprobe out.mp4` reports 150 frames, 30 fps, 1920×1080, ~5s.

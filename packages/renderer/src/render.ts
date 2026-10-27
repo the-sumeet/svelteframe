@@ -32,7 +32,7 @@ interface Bridge {
 	setFrame(n: number): Promise<void>;
 }
 
-type BridgeGlobal = { __Svelteframe?: Bridge };
+type BridgeGlobal = { __Svelteframe?: Bridge; __SvelteframeError?: string };
 
 const STDERR_LIMIT = 16 * 1024;
 
@@ -51,7 +51,13 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderProgress> 
 		page.on('pageerror', (e) => (pageError ??= e));
 
 		await page.goto(url);
-		await page.waitForFunction(() => (globalThis as BridgeGlobal).__Svelteframe?.ready === true);
+		// The page either exposes the bridge or reports why it cannot (unknown composition, bad props...).
+		await page.waitForFunction(() => {
+			const g = globalThis as BridgeGlobal;
+			return g.__Svelteframe?.ready === true || g.__SvelteframeError !== undefined;
+		});
+		const pageFailure = await page.evaluate(() => (globalThis as BridgeGlobal).__SvelteframeError);
+		if (pageFailure !== undefined) throw new Error(`${url} failed to load: ${pageFailure}`);
 
 		const { fps, width, height, durationInFrames: total } = await page.evaluate(
 			() => (globalThis as BridgeGlobal).__Svelteframe!.config
