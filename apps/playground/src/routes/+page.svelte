@@ -12,7 +12,10 @@
 	<div class="player">
 		<Player component={Main} {...config} />
 	</div>
-	<p>Space: play/pause · ←/→: ±1 frame · Shift+←/→: ±1 second</p>
+	<p>
+		Space: play/pause · ←/→: ±1 frame · Shift+←/→: ±1 second ·
+		<a href="/demo">Primitives demo</a>
+	</p>
 </main>
 
 <style>
@@ -34,5 +37,8 @@
 	p {
 		opacity: 0.6;
 		font-size: 13px;
+	}
+	a {
+		color: #8ab4ff;
 	}
 </style>
