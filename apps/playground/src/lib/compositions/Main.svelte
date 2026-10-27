@@ -1,7 +1,3 @@
-<script lang="ts" module>
-	export const config = { fps: 30, width: 1920, height: 1080, durationInFrames: 150 };
-</script>
-
 <script lang="ts">
 	import { Sequence } from '@svelteframe/core';
 	import Intro from '#lib/scenes/Intro.svelte';

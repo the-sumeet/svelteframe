@@ -1,7 +1,3 @@
-<script lang="ts" module>
-	export const config = { fps: 30, width: 1920, height: 1080, durationInFrames: 180 };
-</script>
-
 <script lang="ts">
 	import { Freeze, Loop, Series, SeriesItem } from '@svelteframe/core';
 	import Dots from '#lib/demo/Dots.svelte';

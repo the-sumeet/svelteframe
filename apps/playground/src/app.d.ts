@@ -24,6 +24,8 @@ declare global {
 
 	interface Window {
 		__Svelteframe?: SvelteframeBridge;
+		/** Set by the error page so the renderer can fail with the reason. */
+		__SvelteframeError?: string;
 	}
 }
 

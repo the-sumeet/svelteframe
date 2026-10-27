@@ -1,6 +1,5 @@
 <script lang="ts">
-	import { Player } from '@svelteframe/core';
-	import Main, { config } from '#lib/compositions/Main.svelte';
+	import { compositions } from '#lib/compositions/index.js';
 </script>
 
 <svelte:head>
@@ -9,13 +8,21 @@
 
 <main>
 	<h1>Svelteframe playground</h1>
-	<div class="player">
-		<Player component={Main} {...config} />
-	</div>
-	<p>
-		Space: play/pause · ←/→: ±1 frame · Shift+←/→: ±1 second ·
-		<a href="/demo">Primitives demo</a>
-	</p>
+	<p class="lead">Pick a composition to preview it. Each is also a render target at <code>/render/&lt;id&gt;</code>.</p>
+
+	<ul>
+		{#each compositions as c (c.id)}
+			<li>
+				<a class="title" href="/preview/{c.id}">{c.id}</a>
+				<span class="meta">
+					{c.width}×{c.height} · {c.fps} fps · {c.durationInFrames} frames ({(
+						c.durationInFrames / c.fps
+					).toFixed(1)}s)
+				</span>
+				<code>pnpm render --url http://localhost:5173 --composition {c.id} --out {c.id}.mp4</code>
+			</li>
+		{/each}
+	</ul>
 </main>
 
 <style>
@@ -31,12 +38,39 @@
 		padding: 32px 16px;
 	}
 	h1 {
-		font-size: 20px;
+		font-size: 22px;
 		font-weight: 600;
 	}
-	p {
-		opacity: 0.6;
+	.lead {
+		opacity: 0.7;
+		font-size: 14px;
+	}
+	ul {
+		list-style: none;
+		margin: 24px 0 0;
+		padding: 0;
+		display: grid;
+		gap: 12px;
+	}
+	li {
+		display: grid;
+		gap: 4px;
+		padding: 14px 16px;
+		background: #15171c;
+		border-radius: 8px;
+	}
+	.title {
+		font-size: 17px;
+		font-weight: 600;
+	}
+	.meta {
 		font-size: 13px;
+		opacity: 0.7;
+	}
+	code {
+		font-size: 12px;
+		opacity: 0.8;
+		overflow-wrap: anywhere;
 	}
 	a {
 		color: #8ab4ff;
