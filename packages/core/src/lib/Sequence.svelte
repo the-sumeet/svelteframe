@@ -28,9 +28,7 @@
 			return parent.height;
 		},
 		get durationInFrames() {
-			return Number.isFinite(durationInFrames)
-				? durationInFrames
-				: Math.max(0, parent.durationInFrames - from);
+			return parent.durationInFrames;
 		}
 	};
 	setVideo(local);
