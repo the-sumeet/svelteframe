@@ -1,14 +1,14 @@
 {
   "name": "svelteframe",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev:core": "pnpm --filter @svelteframe/core watch",
+    "dev:play": "pnpm --filter playground dev",
+    "render": "pnpm --filter @svelteframe/renderer exec tsx src/render.ts",
+    "test": "pnpm -r --if-present test"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
@@ -16,6 +16,5 @@
       "onFail": "download"
     }
   },
-  "packageManager": "pnpm@12.15.0",
-  "type": "module"
+  "packageManager": "pnpm@12.15.0"
 }

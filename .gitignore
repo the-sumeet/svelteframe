@@ -1,1 +1,5 @@
 node_modules
+dist
+.svelte-kit
+out.mp4
+.env*

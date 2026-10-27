@@ -1,9 +1,10 @@
 {
-	"name": "core",
+	"name": "@svelteframe/core",
 	"version": "0.0.1",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && pnpm run prepack",
+		"watch": "svelte-package --watch",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"prepack": "svelte-kit sync && svelte-package && publint",
