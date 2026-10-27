@@ -20,6 +20,8 @@ declare global {
 		ready: boolean;
 		/** Resolves once the DOM reflects frame `n`. */
 		setFrame(n: number): Promise<void>;
+		/** Sound recorded by `<Audio>` while rendering, for the renderer to mix. */
+		readonly audio?: readonly unknown[];
 	}
 
 	interface Window {

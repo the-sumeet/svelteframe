@@ -20,7 +20,7 @@
 	<title>Svelteframe render: {id}</title>
 </svelte:head>
 
-<Composition {video}>
+<Composition {video} mode="render">
 	<Root {...inputProps} />
 </Composition>
 

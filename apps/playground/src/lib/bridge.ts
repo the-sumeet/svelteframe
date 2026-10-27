@@ -1,4 +1,4 @@
-import { waitUntilReady, type VideoState } from '@svelteframe/core';
+import { getAudioManifest, waitUntilReady, type VideoState } from '@svelteframe/core';
 import { tick } from 'svelte';
 
 /**
@@ -17,6 +17,10 @@ export function exposeBridge(video: VideoState, config: SvelteframeBridge['confi
 			video.frame = n;
 			await tick();
 			await waitUntilReady();
+		},
+		// What <Audio> recorded; the renderer reads it after the last frame and mixes the sound.
+		get audio() {
+			return getAudioManifest();
 		}
 	};
 

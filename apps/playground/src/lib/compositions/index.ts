@@ -1,5 +1,6 @@
 import { defineComposition, type AnyComposition } from '@svelteframe/core';
 import AsyncDemo from './AsyncDemo.svelte';
+import AudioDemo from './AudioDemo.svelte';
 import Main from './Main.svelte';
 import Primitives from './Primitives.svelte';
 import TitleCard from './TitleCard.svelte';
@@ -30,6 +31,16 @@ export const compositions: AnyComposition[] = [
 		width: 1920,
 		height: 1080,
 		durationInFrames: 90
+	}),
+	// Background music with a volume curve, plus a sound effect that starts at `sfxFrame`.
+	defineComposition({
+		id: 'audio-demo',
+		component: AudioDemo,
+		fps,
+		width: 1920,
+		height: 1080,
+		durationInFrames: 5 * fps,
+		defaultProps: { music: true, sfxFrame: 60 }
 	}),
 	// Takes input props, and its length follows the `seconds` prop.
 	defineComposition({
