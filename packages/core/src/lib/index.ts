@@ -1,5 +1,6 @@
 export { default as AbsoluteFill } from './AbsoluteFill.svelte';
 export { default as Composition } from './Composition.svelte';
+export { default as Player } from './Player.svelte';
 export { default as Sequence } from './Sequence.svelte';
 export { Easing, type EasingFunction } from './easing.js';
 export { interpolate, type ExtrapolateType, type InterpolateOptions } from './interpolate.js';
