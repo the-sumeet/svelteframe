@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import AbsoluteFill from './AbsoluteFill.svelte';
-	import { setVideo, useVideo, type VideoContext } from './video.svelte.js';
+	import { createChildVideo, setVideo, useVideo } from './video.svelte.js';
 
 	interface Props {
 		from?: number;
@@ -14,24 +14,7 @@
 	const parent = useVideo();
 
 	// Children see a frame relative to this sequence's start.
-	const local: VideoContext = {
-		get frame() {
-			return parent.frame - from;
-		},
-		get fps() {
-			return parent.fps;
-		},
-		get width() {
-			return parent.width;
-		},
-		get height() {
-			return parent.height;
-		},
-		get durationInFrames() {
-			return parent.durationInFrames;
-		}
-	};
-	setVideo(local);
+	setVideo(createChildVideo(parent, () => parent.frame - from));
 
 	const active = $derived(parent.frame >= from && parent.frame < from + durationInFrames);
 </script>

@@ -26,6 +26,34 @@ export class VideoState implements VideoContext {
 	}
 }
 
+/**
+ * A view of `parent` with its own timeline. Used by Sequence, Loop and Freeze,
+ * which remap `frame` (and optionally the duration) for their children.
+ */
+export function createChildVideo(
+	parent: VideoContext,
+	frame: () => number,
+	durationInFrames: () => number = () => parent.durationInFrames
+): VideoContext {
+	return {
+		get frame() {
+			return frame();
+		},
+		get fps() {
+			return parent.fps;
+		},
+		get width() {
+			return parent.width;
+		},
+		get height() {
+			return parent.height;
+		},
+		get durationInFrames() {
+			return durationInFrames();
+		}
+	};
+}
+
 const VIDEO_KEY = Symbol('svelteframe.video');
 
 export function setVideo(ctx: VideoContext): void {
