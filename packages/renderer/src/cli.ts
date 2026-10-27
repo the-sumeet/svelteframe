@@ -86,7 +86,8 @@ try {
 		}
 	});
 	if (tty) process.stdout.write('\n');
-	console.log(`Rendered ${result.frame} frames to ${output}`);
+	const audio = result.audioSegments > 0 ? ` with ${result.audioSegments} audio segment(s)` : '';
+	console.log(`Rendered ${result.frame} frames${audio} to ${output}`);
 } catch (err) {
 	if (tty) process.stdout.write('\n');
 	if (controller.signal.aborted) process.exit(130);

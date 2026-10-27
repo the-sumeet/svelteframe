@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { unlink } from 'node:fs/promises';
 import { once } from 'node:events';
 import { chromium, type Browser } from 'playwright';
+import { muxAudio, parseAudioManifest } from './audio.js';
 
 export interface RenderProgress {
 	/** Frames written so far. */
@@ -10,6 +11,11 @@ export interface RenderProgress {
 	elapsedMs: number;
 	/** Average rendered frames per second so far. */
 	fps: number;
+}
+
+export interface RenderResult extends RenderProgress {
+	/** Stretches of sound mixed into the video. */
+	audioSegments: number;
 }
 
 export interface RenderOptions {
@@ -30,13 +36,15 @@ interface Bridge {
 	config: { fps: number; width: number; height: number; durationInFrames: number };
 	ready: boolean;
 	setFrame(n: number): Promise<void>;
+	/** What `<Audio>` recorded while frames were rendered. */
+	audio?: unknown;
 }
 
 type BridgeGlobal = { __Svelteframe?: Bridge; __SvelteframeError?: string };
 
 const STDERR_LIMIT = 16 * 1024;
 
-export async function renderVideo(opts: RenderOptions): Promise<RenderProgress> {
+export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 	const { url, output, onProgress, imageFormat = 'jpeg', quality = 90, chromiumPath, signal } = opts;
 
 	let browser: Browser | undefined;
@@ -130,7 +138,16 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderProgress> 
 
 		stdin.end();
 		await exit;
-		return progress();
+
+		// Sound is added after the picture: `<Audio>` only records what it would play, and each
+		// recording is complete once the last frame has been rendered.
+		const segments = parseAudioManifest(
+			await page.evaluate(() => (globalThis as BridgeGlobal).__Svelteframe?.audio)
+		);
+		if (segments.length > 0) {
+			await muxAudio({ videoPath: output, output, segments, fps, totalFrames: total });
+		}
+		return { ...progress(), audioSegments: segments.length };
 	} catch (err) {
 		if (ffmpeg) {
 			ffmpeg.kill('SIGKILL');
