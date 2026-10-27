@@ -6,7 +6,7 @@
   "scripts": {
     "dev:core": "pnpm --filter @svelteframe/core watch",
     "dev:play": "pnpm --filter playground dev",
-    "render": "pnpm --filter @svelteframe/renderer exec tsx src/render.ts",
+    "render": "pnpm --filter @svelteframe/renderer exec tsx src/cli.ts",
     "test": "pnpm -r --if-present test"
   },
   "devEngines": {

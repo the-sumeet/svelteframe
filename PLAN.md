@@ -52,7 +52,7 @@ Tasks:
 - Root `package.json` scripts:
   - `dev:core` → `pnpm --filter @svelteframe/core watch`
   - `dev:play` → `pnpm --filter playground dev`
-  - `render` → `pnpm --filter @svelteframe/renderer exec tsx src/render.ts`
+  - `render` → `pnpm --filter @svelteframe/renderer exec tsx src/cli.ts` (args pass through, e.g. `pnpm render --url ... --out out.mp4`)
   - `test` → `pnpm -r test`
 - Remove the demo content the `sv create` library template generated in `packages/core/src/routes` (keep a minimal page or delete routes if unused).
 
