@@ -14,6 +14,7 @@ import {
 import { concatChunks } from './chunks.js';
 import { resolveConcurrency, splitFrames, type FrameRange } from './frames.js';
 import { openPage, type BridgeGlobal, type PageHandle } from './page.js';
+import { createVideoFrames, type VideoFrames } from './video-frames.js';
 
 export interface RenderProgress {
 	/** Frames written so far, across all workers. */
@@ -149,6 +150,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 	else signal?.addEventListener('abort', forwardAbort, { once: true });
 
 	let browser: Browser | undefined;
+	let videoFrames: VideoFrames | undefined;
 	let workDir: string | undefined;
 	let touchedOutput = false;
 
@@ -158,7 +160,8 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 		await mkdir(dirname(output), { recursive: true });
 		browser = await chromium.launch({ executablePath: chromiumPath });
 
-		const first = await openPage(browser, url);
+		videoFrames = createVideoFrames({ imageFormat });
+		const first = await openPage(browser, url, videoFrames);
 		const { fps, width, height, durationInFrames: total } = await first.page.evaluate(
 			() => (globalThis as BridgeGlobal).__Svelteframe!.config
 		);
@@ -166,7 +169,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 		const ranges = splitFrames(total, resolveConcurrency(opts.concurrency, total));
 		const workers = [
 			first,
-			...(await Promise.all(ranges.slice(1).map(() => openPage(browser!, url))))
+			...(await Promise.all(ranges.slice(1).map(() => openPage(browser!, url, videoFrames))))
 		];
 		await Promise.all(workers.map((worker) => worker.page.setViewportSize({ width, height })));
 
@@ -227,13 +230,12 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 			recorded.push(...clipAudioSegments(manifest, ranges[i], fps));
 		}
 		const segments = mergeAudioSegments(recorded, fps);
-		if (segments.length > 0) {
-			await muxAudio({ videoPath: output, output, segments, fps, totalFrames: total });
-		}
+		const mixed =
+			segments.length > 0 ? await muxAudio({ videoPath: output, output, segments, fps, totalFrames: total }) : 0;
 
 		return {
 			...progress(),
-			audioSegments: segments.length,
+			audioSegments: mixed,
 			concurrency: ranges.length,
 			wallMs: performance.now() - wallStart
 		};
@@ -243,6 +245,7 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 	} finally {
 		signal?.removeEventListener('abort', forwardAbort);
 		await browser?.close().catch(() => {});
+		await videoFrames?.close();
 		if (workDir) await rm(workDir, { recursive: true, force: true });
 	}
 }

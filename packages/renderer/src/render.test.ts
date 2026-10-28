@@ -4,7 +4,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
-import { FPS, FRAMES, skip, startFixture, type Fixture } from '../test/fixture.js';
+import { FPS, FRAMES, skip, startFixture, VIDEO_FPS, VIDEO_FRAMES, type Fixture } from '../test/fixture.js';
 import { renderVideo } from './render.js';
 
 /** These render the fixture page, not the playground. They need ffmpeg and Chromium. */
@@ -135,6 +135,49 @@ describe('renderVideo with several pages', { skip }, () => {
 		let differing = 0;
 		for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) differing++;
 		assert.equal(differing, 0, `${differing} samples differ`);
+	});
+
+	describe('with video from <OffthreadVideo>', () => {
+		const hasAudioStream = (file: string) =>
+			spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=codec_type', '-of', 'csv=p=0', file]).stdout.toString().includes('audio');
+
+		for (const concurrency of [1, 3]) {
+			it(`puts the right frame of the video in each frame, with ${concurrency} worker(s)`, async () => {
+				const output = outputOf(`video-${concurrency}`);
+				await renderVideo({ url: page('video=frames.mp4'), output, concurrency });
+				const luma = lumaPerFrame(output);
+				assert.equal(luma.length, FRAMES);
+				luma.forEach((y, n) => {
+					// A 30 fps composition over a 24 fps video: frame k of the video is gray 3k scaled to full range.
+					const k = Math.min(Math.floor((n * VIDEO_FPS) / FPS + 1e-6), VIDEO_FRAMES - 1);
+					const expected = (3 * k * 255) / 219;
+					assert.ok(Math.abs(y - expected) <= 2.5, `frame ${n} should show video frame ${k}: luma ${y}, expected ${expected.toFixed(1)}`);
+				});
+			});
+		}
+
+		it('mixes the sound of the video', async () => {
+			const output = outputOf('video-sound');
+			const result = await renderVideo({ url: page('video=frames-audio.mp4&audio=frames-audio.mp4'), output, concurrency: 2 });
+			assert.equal(result.audioSegments, 1);
+			assert.ok(hasAudioStream(output));
+		});
+
+		it('renders a video with no sound without trying to mix it', async () => {
+			const output = outputOf('video-silent');
+			const result = await renderVideo({ url: page('video=frames.mp4&audio=frames.mp4'), output, concurrency: 2 });
+			assert.equal(result.audioSegments, 0);
+			assert.equal(hasAudioStream(output), false);
+			assert.equal(lumaPerFrame(output).length, FRAMES);
+		});
+
+		it('fails with the reason when the video cannot be used, and cleans up', async () => {
+			const output = outputOf('video-missing');
+			await assert.rejects(() => renderVideo({ url: page('video=tone.wav'), output, concurrency: 2 }), /tone\.wav" has no video stream/);
+			assert.equal(existsSync(output), false);
+			assert.equal(leftoverFfmpeg(), '');
+			assert.deepEqual(readdirSync(tmpdir()).filter((n) => n.startsWith('svelteframe-video-')), []);
+		});
 	});
 
 	describe('when something goes wrong', () => {

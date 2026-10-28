@@ -1,4 +1,5 @@
 import type { Browser, Page } from 'playwright';
+import type { VideoFrames } from './video-frames.js';
 
 /** What a render page exposes on `window.__Svelteframe` (see the playground's bridge). */
 export interface Bridge {
@@ -17,9 +18,13 @@ export interface PageHandle {
 	pageError: () => Error | undefined;
 }
 
-/** Open `url` and wait until it offers the bridge, or fail with the reason it could not. */
-export async function openPage(browser: Browser, url: string): Promise<PageHandle> {
+/**
+ * Open `url` and wait until it offers the bridge, or fail with the reason it could not.
+ * `videoFrames` answers the frame requests of `<OffthreadVideo>`.
+ */
+export async function openPage(browser: Browser, url: string, videoFrames?: VideoFrames): Promise<PageHandle> {
 	const page = await browser.newPage();
+	await videoFrames?.attach(page);
 	let pageError: Error | undefined;
 	page.on('pageerror', (e) => (pageError ??= e));
 

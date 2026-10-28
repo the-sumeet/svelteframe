@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises';
 import { dirname, extname } from 'node:path';
 import { chromium } from 'playwright';
 import { openPage, type BridgeGlobal } from './page.js';
+import { createVideoFrames } from './video-frames.js';
 
 export type ImageFormat = 'png' | 'jpeg';
 
@@ -50,8 +51,9 @@ export async function renderStill(opts: StillOptions): Promise<StillResult> {
 
 	signal?.throwIfAborted();
 	const browser = await chromium.launch({ executablePath: chromiumPath });
+	const videoFrames = createVideoFrames({ imageFormat: format });
 	try {
-		const worker = await openPage(browser, url);
+		const worker = await openPage(browser, url, videoFrames);
 		const { width, height, durationInFrames: total } = await worker.page.evaluate(
 			() => (globalThis as BridgeGlobal).__Svelteframe!.config
 		);
@@ -72,5 +74,6 @@ export async function renderStill(opts: StillOptions): Promise<StillResult> {
 		return { frame, total, width, height };
 	} finally {
 		await browser.close().catch(() => {});
+		await videoFrames.close();
 	}
 }

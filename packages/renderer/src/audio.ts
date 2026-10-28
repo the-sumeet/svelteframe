@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, rename, rm, unlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, rename, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, dirname, extname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { basename, dirname, join } from 'node:path';
 import type { FrameRange } from './frames.js';
+import { localSource, probeMedia } from './source.js';
 
 /** One stretch of a sound, as recorded by `<Audio>` in the page (see `@svelteframe/core`). */
 export interface AudioSegment {
@@ -233,23 +233,6 @@ function runFfmpeg(args: string[]): Promise<void> {
 	});
 }
 
-/** Local path for a source URL, downloading it into `dir` if it is remote. */
-async function localFile(src: string, dir: string, index: number): Promise<string> {
-	const url = new URL(src);
-	if (url.protocol === 'file:') return fileURLToPath(url);
-	if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-		throw new Error(`Unsupported audio source "${src}"`);
-	}
-
-	const response = await fetch(url);
-	if (!response.ok) {
-		throw new Error(`Could not fetch audio "${src}": HTTP ${response.status}`);
-	}
-	const file = join(dir, `source-${index}${extname(url.pathname)}`);
-	await writeFile(file, Buffer.from(await response.arrayBuffer()));
-	return file;
-}
-
 export interface MuxOptions {
 	/** The finished video, without sound. */
 	videoPath: string;
@@ -260,22 +243,31 @@ export interface MuxOptions {
 	totalFrames: number;
 }
 
-/** Mix the segments and add them to the video without re-encoding the picture. */
+/**
+ * Mix the segments and add them to the video without re-encoding the picture. A source with no
+ * audio track (a silent video in `<OffthreadVideo>`) is skipped. Returns how many segments were mixed.
+ */
 export async function muxAudio({
 	videoPath,
 	output,
 	segments,
 	fps,
 	totalFrames
-}: MuxOptions): Promise<void> {
+}: MuxOptions): Promise<number> {
 	const dir = await mkdtemp(join(tmpdir(), 'svelteframe-audio-'));
 	// Next to the output so the final rename stays on one filesystem.
 	const muxed = join(dirname(output), `.svelteframe-${process.pid}-${basename(output)}`);
 	try {
 		const files = new Map<string, string>();
+		const silent = new Set<string>();
 		for (const { src } of segments) {
-			if (!files.has(src)) files.set(src, await localFile(src, dir, files.size));
+			if (files.has(src)) continue;
+			const file = await localSource(src, dir, files.size, 'audio');
+			files.set(src, file);
+			if (!(await probeMedia(file)).hasAudio) silent.add(src);
 		}
+		segments = segments.filter((segment) => !silent.has(segment.src));
+		if (segments.length === 0) return 0;
 
 		await runFfmpeg([
 			'-hide_banner',
@@ -300,6 +292,7 @@ export async function muxAudio({
 			muxed
 		]);
 		await rename(muxed, output);
+		return segments.length;
 	} finally {
 		await unlink(muxed).catch(() => {});
 		await rm(dir, { recursive: true, force: true });
