@@ -25,6 +25,7 @@ export {
 export { default as Freeze } from './Freeze.svelte';
 export { default as Img } from './Img.svelte';
 export { default as Loop } from './Loop.svelte';
+export { default as OffthreadVideo } from './OffthreadVideo.svelte';
 export { default as Player } from './Player.svelte';
 export { default as Sequence } from './Sequence.svelte';
 export { default as Series } from './Series.svelte';
