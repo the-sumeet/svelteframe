@@ -203,10 +203,13 @@ Verify: render with background music + a sound effect at frame 60; check sync wi
 
 ## Later / stretch
 
-- `OffthreadVideo` — extract frames from embedded videos with ffmpeg server-side for frame-accurate video-in-video.
+- ~~`OffthreadVideo`~~ — done. `<OffthreadVideo src startFrom endAt volume playbackRate muted fit>`.
+  - Preview: a `<video>` kept at the frame's time (shares its sync code with `<Audio>`).
+  - Render: an `<img>` of the frame, decoded by ffmpeg. The page asks `/__svelteframe/video-frame?src&time`; the renderer answers that request itself (Playwright route), so projects need no server code. It downloads each video once, probes its frame rate, and shows the last frame that starts at or before the time (the last frame is held past the end).
+  - Sound is recorded like `<Audio>` and mixed in; a video with no audio track is skipped.
+  - A `<Sequence>` fills its nearest positioned parent, so put the video's box in `position: relative`.
 - Studio UI: composition sidebar, timeline showing Sequences, props editor.
 - Transitions package (fade, slide, wipe) built on `interpolate` + `spring`.
-- Lambda/cloud rendering (frame-range chunks across workers).
 - `create-svelteframe` scaffolding template.
 
 ## Definition of done for each milestone

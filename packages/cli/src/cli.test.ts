@@ -114,7 +114,7 @@ describe('the svelteframe command', () => {
 			const list = JSON.parse(result.stdout) as { id: string; durationInFrames: number }[];
 			assert.deepEqual(
 				list.map((c) => c.id),
-				['main', 'primitives', 'async', 'audio-demo', 'title-card']
+				['main', 'primitives', 'async', 'audio-demo', 'video-demo', 'title-card']
 			);
 			assert.match(result.stderr, /Building the project/);
 			assert.doesNotMatch(result.stderr + result.stdout, /adapter-auto/, 'the build output is not shown');
@@ -174,10 +174,37 @@ describe('the svelteframe command', () => {
 			assert.match(streams, /audio/);
 		});
 
+		it('render shows the frames of an embedded video, with its sound', async () => {
+			const result = await run(['render', 'video-demo', '--out', 'video.mp4', '--concurrency', '3', ...root], work);
+			assert.equal(result.code, 0, result.stderr);
+			assert.match(result.stdout, /Rendered 150 frames with 1 audio segment\(s\) using 3 workers/);
+			assert.equal(frames(join(work, 'video.mp4')), 150);
+			const streams = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type', '-of', 'csv=p=0', join(work, 'video.mp4')]).stdout.toString();
+			assert.match(streams, /audio/);
+
+			// Frame 60 shows the clip 2 s in on the left, and, at half speed from 1 s, 1.5 s in on the right.
+			const still = await run(['still', 'video-demo', '--frame', '60', '--out', 'video-60.png', ...root], work);
+			assert.equal(still.code, 0, still.stderr);
+			const clip = join(playground, 'static/video/clip.mp4');
+			// How alike the inside of a clip's box in the still is to the clip at `seconds` (1 is identical).
+			const similarity = (boxX: number, seconds: number) => {
+				const { stderr } = spawnSync('ffmpeg', [
+					'-i', join(work, 'video-60.png'), '-ss', String(seconds), '-i', clip,
+					'-lavfi', `[0:v]crop=760:410:${boxX + 20}:363[a];[1:v]scale=800:450,crop=760:410:20:20[b];[a][b]ssim`,
+					'-frames:v', '1', '-f', 'null', '-'
+				]);
+				return Number(/All:([\d.]+)/.exec(stderr.toString())?.[1]);
+			};
+			assert.ok(similarity(128, 2) > 0.9, `left box: ${similarity(128, 2)}`);
+			assert.ok(similarity(128, 2) > similarity(128, 0.5) + 0.01, 'the left box is this moment and not another');
+			assert.ok(similarity(992, 1.5) > 0.9, `right box: ${similarity(992, 1.5)}`);
+			assert.ok(similarity(992, 1.5) > similarity(992, 2) + 0.01, 'the right box is at half speed, not normal');
+		});
+
 		it('render fails with the reason for an unknown composition, leaving no file', async () => {
 			const result = await run(['render', 'nope', '--out', 'nope.mp4', ...root], work);
 			assert.equal(result.code, 1);
-			assert.match(result.stderr, /Unknown composition "nope". Available: main, primitives, async, audio-demo, title-card/);
+			assert.match(result.stderr, /Unknown composition "nope". Available: main, primitives, async, audio-demo, video-demo, title-card/);
 			assert.equal(result.stdout, '');
 			assert.equal(existsSync(join(work, 'nope.mp4')), false);
 		});
@@ -207,7 +234,7 @@ describe('the svelteframe command', () => {
 			const result = await run(['compositions', '--json', '--dev', ...root], work);
 			assert.equal(result.code, 0, result.stderr);
 			assert.match(result.stderr, /Starting the dev server/);
-			assert.equal((JSON.parse(result.stdout) as unknown[]).length, 5);
+			assert.equal((JSON.parse(result.stdout) as unknown[]).length, 6);
 		});
 
 		it('Ctrl-C stops a render, exits 130 and leaves nothing behind', async () => {

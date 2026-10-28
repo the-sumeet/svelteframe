@@ -4,6 +4,7 @@ import AudioDemo from './AudioDemo.svelte';
 import Main from './Main.svelte';
 import Primitives from './Primitives.svelte';
 import TitleCard from './TitleCard.svelte';
+import VideoDemo from './VideoDemo.svelte';
 
 const fps = 30;
 
@@ -41,6 +42,16 @@ export const compositions: AnyComposition[] = [
 		height: 1080,
 		durationInFrames: 5 * fps,
 		defaultProps: { music: true, sfxFrame: 60 }
+	}),
+	// Two clips of the same video, one trimmed and slowed down, frame-accurate through ffmpeg.
+	defineComposition({
+		id: 'video-demo',
+		component: VideoDemo,
+		fps,
+		width: 1920,
+		height: 1080,
+		durationInFrames: 5 * fps,
+		defaultProps: { sound: true }
 	}),
 	// Takes input props, and its length follows the `seconds` prop.
 	defineComposition({
