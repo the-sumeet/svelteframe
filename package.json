@@ -4,10 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "pnpm --filter \"./packages/*\" build",
     "dev:core": "pnpm --filter @svelteframe/core watch",
     "dev:play": "pnpm --filter playground dev",
+    "svelteframe": "svelteframe --root apps/playground",
     "render": "pnpm --filter @svelteframe/renderer exec tsx src/cli.ts",
     "test": "pnpm -r --if-present test"
+  },
+  "devDependencies": {
+    "@svelteframe/cli": "workspace:*"
   },
   "devEngines": {
     "packageManager": {

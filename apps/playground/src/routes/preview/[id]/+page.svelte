@@ -22,7 +22,7 @@
 	<pre>{JSON.stringify(data.props, null, 2)}</pre>
 	<p class="hint">
 		Override with <code>?props=</code> (base64url JSON), or render with
-		<code>pnpm render --url {'<'}base url{'>'} --composition {data.id} --props props.json</code>.
+		<code>pnpm svelteframe render {data.id} --props props.json</code>.
 	</p>
 </main>
 

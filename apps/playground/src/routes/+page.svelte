@@ -19,7 +19,7 @@
 						c.durationInFrames / c.fps
 					).toFixed(1)}s)
 				</span>
-				<code>pnpm render --url http://localhost:5173 --composition {c.id} --out {c.id}.mp4</code>
+				<code>pnpm svelteframe render {c.id}</code>
 			</li>
 		{/each}
 	</ul>

@@ -164,7 +164,11 @@ settings:
 
 importers:
 
-  .: {}
+  .:
+    devDependencies:
+      '@svelteframe/cli':
+        specifier: workspace:*
+        version: link:packages/cli
 
   apps/playground:
     dependencies:
@@ -193,6 +197,25 @@ importers:
       vite:
         specifier: ^8.3.0
         version: 8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(tsx@4.23.15)
+
+  packages/cli:
+    dependencies:
+      '@svelteframe/renderer':
+        specifier: workspace:*
+        version: link:../renderer
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.5
+      playwright:
+        specifier: ^1.64.1
+        version: 1.64.1
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
 
   packages/core:
     devDependencies:

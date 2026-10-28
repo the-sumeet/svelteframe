@@ -191,10 +191,13 @@ Verify: render with background music + a sound effect at frame 60; check sync wi
 
 ## Milestone 10 — CLI package
 
-`packages/cli` → `svelteframe` binary:
-- `svelteframe render <compositionId> [--out] [--props] [--concurrency] [--quality] [--png]` — starts the playground/user project's Vite server programmatically (or `vite build` + `vite preview` for speed), renders, shuts the server down.
-- `svelteframe still <compositionId> --frame N --out frame.png`.
-- `svelteframe compositions` — lists ids with metadata.
+`packages/cli` → `svelteframe` binary (`pnpm svelteframe …` from the repo root runs it on `apps/playground`):
+- `svelteframe render <id> [--out] [--props] [--concurrency] [--quality] [--png]` — serves the project with **its own Vite** (`vite build` + `vite preview` by default, `--dev` for the dev server, or `--url` to use a server that is already running), renders, and shuts the server down.
+- `svelteframe still <id> --frame N --out frame.png` — one frame as `.png` or `.jpg`.
+- `svelteframe compositions [--json]` — lists ids with metadata. A project opts in by serving `GET /svelteframe/compositions.json` returning `describeCompositions(compositions)` from `@svelteframe/core`.
+- Common options: `--root <dir>` (the project, default the current directory), `--chromium <path>`.
+- Builds of one project take turns (a lock outside the project), since they share the project's build folder.
+- Both `@svelteframe/renderer` and `@svelteframe/cli` compile with `tsc` (`pnpm build` at the root builds all packages in order); the binary runs from `dist`.
 
 ---
 
