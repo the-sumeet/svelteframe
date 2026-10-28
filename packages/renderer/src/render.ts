@@ -83,6 +83,11 @@ async function renderRange(job: RangeJob): Promise<void> {
 			String(fps),
 			'-i',
 			'-',
+			// Screenshots are full-range sRGB. Left untagged, ffmpeg writes full-range BT.601
+			// (`yuvj420p`), which players show with different contrast and colours. Convert to the
+			// standard limited-range BT.709 and say so in the stream.
+			'-vf',
+			'scale=out_range=tv:out_color_matrix=bt709,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv',
 			'-c:v',
 			'libx264',
 			'-pix_fmt',

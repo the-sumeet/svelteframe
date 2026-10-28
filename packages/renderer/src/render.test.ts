@@ -16,7 +16,7 @@ const outputOf = (name: string) => join(fixture.dir, `${name}.mp4`);
 const chunkDirs = () => readdirSync(tmpdir()).filter((name) => name.startsWith('svelteframe-chunks-'));
 const leftoverFfmpeg = () => spawnSync('pgrep', ['-f', 'svelteframe-chunks']).stdout.toString().trim();
 
-/** Mean gray of every frame, as ffmpeg decodes it. */
+/** Brightness of each frame (0-255), after the decoder has expanded limited range to full. */
 function lumaPerFrame(file: string): number[] {
 	const { stdout } = spawnSync(
 		'ffmpeg',
@@ -26,13 +26,14 @@ function lumaPerFrame(file: string): number[] {
 	return [...stdout];
 }
 
-/** Whether the video stores full-range luma (`yuvj420p`) rather than the usual 16-235. */
-function isFullRange(file: string): boolean {
+/** How the video says its colours are stored. */
+function colorInfo(file: string) {
 	const { stdout } = spawnSync('ffprobe', [
-		'-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=pix_fmt,color_range', '-of', 'csv=p=0', file
+		'-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=pix_fmt,color_range,color_space,color_primaries,color_transfer', '-of', 'default=noprint_wrappers=1', file
 	]);
-	const [pixFmt, colorRange] = stdout.toString().trim().split(',');
-	return pixFmt.startsWith('yuvj') || colorRange === 'pc';
+	return Object.fromEntries(
+		stdout.toString().trim().split('\n').map((line) => line.split('=') as [string, string])
+	);
 }
 
 /** Presentation times of the video frames, in order. */
@@ -67,10 +68,9 @@ describe('renderVideo with several pages', { skip }, () => {
 
 			const luma = lumaPerFrame(output);
 			assert.equal(luma.length, FRAMES, 'frame count');
-			const fullRange = isFullRange(output);
 			luma.forEach((y, frame) => {
 				const gray = 4 * frame;
-				const expected = fullRange ? gray : 16 + (219 * gray) / 255;
+				const expected = gray;
 				assert.ok(Math.abs(y - expected) <= 3, `frame ${frame}: luma ${y}, expected ${expected.toFixed(1)}`);
 			});
 
@@ -81,6 +81,21 @@ describe('renderVideo with several pages', { skip }, () => {
 			});
 		});
 	}
+
+	it('writes standard limited-range BT.709, tagged as such', async () => {
+		const output = outputOf('color');
+		await renderVideo({ url: page(), output, concurrency: 2 });
+		// The stored values, not decoded: the first frame is black, which limited range stores as 16.
+		const { stdout } = spawnSync('ffmpeg', ['-v', 'error', '-i', output, '-frames:v', '1', '-pix_fmt', 'yuv420p', '-f', 'rawvideo', '-']);
+		assert.ok(Math.abs(stdout[0] - 16) <= 1, `stored luma ${stdout[0]}`);
+		assert.deepEqual(colorInfo(output), {
+			pix_fmt: 'yuv420p',
+			color_range: 'tv',
+			color_space: 'bt709',
+			color_transfer: 'bt709',
+			color_primaries: 'bt709'
+		});
+	});
 
 	it('creates the folders the output is in', async () => {
 		for (const concurrency of [1, 3]) {
