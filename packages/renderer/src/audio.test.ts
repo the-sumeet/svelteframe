@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
 	buildAudioFilter,
+	clipAudioSegments,
+	mergeAudioSegments,
 	parseAudioManifest,
 	tempoFilters,
 	volumeFilters,
@@ -171,5 +173,167 @@ describe('parseAudioManifest', () => {
 		);
 		assert.throws(() => parseAudioManifest([{ ...segment(), volume: [1, -1] }]), /volume/);
 		assert.throws(() => parseAudioManifest([{ ...segment(), volume: 'loud' }]), /volume/);
+	});
+});
+
+describe('mergeAudioSegments', () => {
+	const fps = 30;
+	// Frames 0-9 and 10-19 of one sound played at normal speed: the second piece starts 10 frames in.
+	const first = segment({ startFrame: 0, durationInFrames: 10 });
+	const second = segment({ startFrame: 10, durationInFrames: 10, sourceStartSeconds: 10 / fps });
+
+	it('joins a sound that was split where two pages met', () => {
+		assert.deepEqual(mergeAudioSegments([first, second], fps), [segment({ startFrame: 0, durationInFrames: 20 })]);
+	});
+
+	it('does not depend on the order it is given', () => {
+		assert.deepEqual(mergeAudioSegments([second, first], fps), mergeAudioSegments([first, second], fps));
+	});
+
+	it('joins a chain of any length', () => {
+		const pieces = [0, 1, 2, 3].map((i) =>
+			segment({ startFrame: i * 10, durationInFrames: 10, sourceStartSeconds: (i * 10) / fps })
+		);
+		assert.deepEqual(mergeAudioSegments(pieces, fps), [segment({ startFrame: 0, durationInFrames: 40 })]);
+	});
+
+	it('takes the playback rate into account when checking the source position', () => {
+		const rate = 2;
+		const a = segment({ startFrame: 0, durationInFrames: 10, playbackRate: rate });
+		const b = segment({ startFrame: 10, durationInFrames: 10, playbackRate: rate, sourceStartSeconds: (10 * rate) / fps });
+		assert.deepEqual(mergeAudioSegments([a, b], fps), [
+			segment({ startFrame: 0, durationInFrames: 20, playbackRate: rate })
+		]);
+	});
+
+	it('keeps a constant volume constant when both pieces share it', () => {
+		const [merged] = mergeAudioSegments([{ ...first, volume: 0.5 }, { ...second, volume: 0.5 }], fps);
+		assert.equal(merged.volume, 0.5);
+	});
+
+	it('turns differing volumes into one value per frame, in order', () => {
+		const [merged] = mergeAudioSegments(
+			[
+				{ ...first, durationInFrames: 3, volume: [0, 0.1, 0.2] },
+				{ ...second, startFrame: 3, durationInFrames: 2, sourceStartSeconds: 3 / fps, volume: 1 }
+			],
+			fps
+		);
+		assert.deepEqual(merged.volume, [0, 0.1, 0.2, 1, 1]);
+		assert.equal(merged.durationInFrames, 5);
+	});
+
+	it('leaves segments that do not continue each other', () => {
+		// A gap in the video.
+		const gap = segment({ startFrame: 12, durationInFrames: 10, sourceStartSeconds: 12 / fps });
+		// A loop starting over: contiguous in the video, but back at the start of the source.
+		const loop = segment({ startFrame: 10, durationInFrames: 10, sourceStartSeconds: 0 });
+		// Another file, and another speed.
+		const other = segment({ src: 'http://host/b.wav', startFrame: 10, durationInFrames: 10, sourceStartSeconds: 10 / fps });
+		const faster = segment({ startFrame: 10, durationInFrames: 10, sourceStartSeconds: 10 / fps, playbackRate: 2 });
+
+		for (const next of [gap, loop, other, faster]) {
+			assert.equal(mergeAudioSegments([first, next], fps).length, 2);
+		}
+	});
+
+	it('keeps concurrent sounds apart', () => {
+		const music = segment({ src: 'http://host/music.wav', startFrame: 0, durationInFrames: 10 });
+		const effect = segment({ src: 'http://host/ding.wav', startFrame: 5, durationInFrames: 10 });
+		const musicRest = segment({ src: 'http://host/music.wav', startFrame: 10, durationInFrames: 10, sourceStartSeconds: 10 / fps });
+
+		const result = mergeAudioSegments([music, effect, musicRest], fps);
+		assert.equal(result.length, 2);
+		assert.deepEqual(
+			result.map((s) => [s.src.split('/').pop(), s.startFrame, s.durationInFrames]),
+			[
+				['music.wav', 0, 20],
+				['ding.wav', 5, 10]
+			]
+		);
+	});
+
+	it('does not change what it is given', () => {
+		const a = { ...first, volume: [1, 1] };
+		const b = { ...second, volume: [0, 0] };
+		mergeAudioSegments([a, b], fps);
+		assert.deepEqual(a.volume, [1, 1]);
+		assert.equal(a.durationInFrames, 10);
+		assert.deepEqual(b.volume, [0, 0]);
+	});
+
+	it('returns an empty list for no segments', () => {
+		assert.deepEqual(mergeAudioSegments([], fps), []);
+	});
+});
+
+describe('clipAudioSegments', () => {
+	const fps = 30;
+	const range = { start: 20, end: 40 };
+	const sound = (overrides: Partial<AudioSegment>) =>
+		segment({ startFrame: 20, durationInFrames: 20, sourceStartSeconds: 20 / fps, ...overrides });
+
+	it('keeps a segment that lies inside the range, untouched', () => {
+		const inside = sound({ startFrame: 25, durationInFrames: 5, sourceStartSeconds: 25 / fps });
+		assert.deepEqual(clipAudioSegments([inside], range, fps), [inside]);
+	});
+
+	it('drops what was recorded outside the range, such as the frame a page shows on load', () => {
+		const onLoad = segment({ startFrame: 0, durationInFrames: 1 });
+		const later = segment({ startFrame: 50, durationInFrames: 10 });
+		assert.deepEqual(clipAudioSegments([onLoad, later], range, fps), []);
+		// A segment that merely touches the range does not overlap it.
+		assert.deepEqual(clipAudioSegments([segment({ startFrame: 10, durationInFrames: 10 })], range, fps), []);
+		assert.deepEqual(clipAudioSegments([segment({ startFrame: 40, durationInFrames: 5 })], range, fps), []);
+	});
+
+	it('cuts the front, moving the start in the video and in the source', () => {
+		const [clipped] = clipAudioSegments([segment({ startFrame: 10, durationInFrames: 20, playbackRate: 2 })], range, fps);
+		assert.equal(clipped.startFrame, 20);
+		assert.equal(clipped.durationInFrames, 10);
+		// 10 frames skipped at double speed: 20 frames of source.
+		assert.ok(Math.abs(clipped.sourceStartSeconds - 20 / fps) < 1e-9);
+	});
+
+	it('cuts the end', () => {
+		const [clipped] = clipAudioSegments([sound({ durationInFrames: 30 })], range, fps);
+		assert.equal(clipped.startFrame, 20);
+		assert.equal(clipped.durationInFrames, 20);
+		assert.equal(clipped.sourceStartSeconds, 20 / fps);
+	});
+
+	it('cuts a per-frame volume to match', () => {
+		const volume = Array.from({ length: 30 }, (_, i) => i); // frames 10..39
+		const [clipped] = clipAudioSegments([segment({ startFrame: 10, durationInFrames: 30, volume })], range, fps);
+		assert.deepEqual(clipped.volume, volume.slice(10, 30));
+		assert.equal((clipped.volume as number[]).length, clipped.durationInFrames);
+	});
+
+	it('leaves a constant volume alone', () => {
+		const [clipped] = clipAudioSegments([segment({ startFrame: 10, durationInFrames: 20, volume: 0.5 })], range, fps);
+		assert.equal(clipped.volume, 0.5);
+	});
+
+	it('does not change what it is given', () => {
+		const original = segment({ startFrame: 10, durationInFrames: 30, volume: [1, 2, 3] });
+		clipAudioSegments([original], range, fps);
+		assert.equal(original.startFrame, 10);
+		assert.deepEqual(original.volume, [1, 2, 3]);
+	});
+
+	it('followed by a merge, gives back what one page would have recorded', () => {
+		// The same sound seen by two pages that each also recorded frame 0 on load.
+		const pageA = [segment({ startFrame: 0, durationInFrames: 20, volume: Array(20).fill(0.5) })];
+		const pageB = [
+			segment({ startFrame: 0, durationInFrames: 1, volume: [0.5] }),
+			segment({ startFrame: 20, durationInFrames: 20, sourceStartSeconds: 20 / fps, volume: Array(20).fill(0.5) })
+		];
+		const all = [
+			...clipAudioSegments(pageA, { start: 0, end: 20 }, fps),
+			...clipAudioSegments(pageB, { start: 20, end: 40 }, fps)
+		];
+		assert.deepEqual(mergeAudioSegments(all, fps), [
+			segment({ startFrame: 0, durationInFrames: 40, volume: Array(40).fill(0.5) })
+		]);
 	});
 });

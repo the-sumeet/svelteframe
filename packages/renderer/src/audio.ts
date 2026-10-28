@@ -3,6 +3,7 @@ import { mkdtemp, rename, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { FrameRange } from './frames.js';
 
 /** One stretch of a sound, as recorded by `<Audio>` in the page (see `@svelteframe/core`). */
 export interface AudioSegment {
@@ -144,6 +145,80 @@ export function parseAudioManifest(value: unknown): AudioSegment[] {
 		}
 		return entry as AudioSegment;
 	});
+}
+
+/**
+ * Keep only the part of each segment inside `range`. A page records everything it shows, including
+ * frame 0 when it loads, but a worker was asked to render just its own frames: anything else it
+ * recorded belongs to another worker and would be mixed in twice.
+ */
+export function clipAudioSegments(segments: AudioSegment[], range: FrameRange, fps: number): AudioSegment[] {
+	const clipped: AudioSegment[] = [];
+	for (const segment of segments) {
+		const end = segment.startFrame + segment.durationInFrames;
+		const from = Math.max(segment.startFrame, range.start);
+		const to = Math.min(end, range.end);
+		if (to <= from) continue;
+
+		if (from === segment.startFrame && to === end) {
+			clipped.push(segment);
+			continue;
+		}
+		const skipped = from - segment.startFrame;
+		clipped.push({
+			...segment,
+			startFrame: from,
+			durationInFrames: to - from,
+			sourceStartSeconds: segment.sourceStartSeconds + (skipped * segment.playbackRate) / fps,
+			volume: Array.isArray(segment.volume) ? segment.volume.slice(skipped, skipped + (to - from)) : segment.volume
+		});
+	}
+	return clipped;
+}
+
+/** A segment's gain as one value per frame. */
+const perFrame = (segment: AudioSegment): number[] =>
+	Array.isArray(segment.volume)
+		? segment.volume
+		: Array.from({ length: segment.durationInFrames }, () => segment.volume as number);
+
+/** Whether `next` carries on exactly where `previous` stops, in the video and in the source. */
+function continues(previous: AudioSegment, next: AudioSegment, fps: number): boolean {
+	return (
+		previous.src === next.src &&
+		previous.playbackRate === next.playbackRate &&
+		previous.startFrame + previous.durationInFrames === next.startFrame &&
+		Math.abs(
+			previous.sourceStartSeconds +
+				(previous.durationInFrames * previous.playbackRate) / fps -
+				next.sourceStartSeconds
+		) < 1e-6
+	);
+}
+
+/**
+ * Join segments that continue one another into one. When frames are rendered by several pages,
+ * a sound that spans a boundary is recorded as two pieces; mixing them as one gives exactly what a
+ * single page would have produced, with no seam. Other segments, such as a loop starting over,
+ * are left as they are. The input is not changed.
+ */
+export function mergeAudioSegments(segments: AudioSegment[], fps: number): AudioSegment[] {
+	const merged: AudioSegment[] = [];
+	const ordered = [...segments].sort((a, b) => a.startFrame - b.startFrame);
+
+	for (const segment of ordered) {
+		const previous = merged.find((candidate) => continues(candidate, segment, fps));
+		if (!previous) {
+			merged.push({ ...segment, volume: Array.isArray(segment.volume) ? [...segment.volume] : segment.volume });
+			continue;
+		}
+
+		const sameLevel =
+			!Array.isArray(previous.volume) && !Array.isArray(segment.volume) && previous.volume === segment.volume;
+		previous.volume = sameLevel ? previous.volume : [...perFrame(previous), ...perFrame(segment)];
+		previous.durationInFrames += segment.durationInFrames;
+	}
+	return merged;
 }
 
 function runFfmpeg(args: string[]): Promise<void> {
