@@ -1,85 +1,18 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
-import { chromium } from 'playwright';
+import { FPS, FRAMES, skip, startFixture, type Fixture } from '../test/fixture.js';
 import { renderVideo } from './render.js';
 
-/**
- * These render a small page served from here, not the playground: every frame is a different gray,
- * so the decoded video shows exactly which frame is where. They need ffmpeg and Chromium.
- */
-const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
-const hasChromium = existsSync(chromium.executablePath());
-const skip = (!hasFfmpeg && 'ffmpeg is not installed') || (!hasChromium && 'Chromium is not installed');
-
-const FPS = 30;
-const FRAMES = 60;
+/** These render the fixture page, not the playground. They need ffmpeg and Chromium. */
 const RATE = 48000;
 
-/** One frame is gray `4 * frame`. A page reports what it rendered the way `<Audio>` would. */
-const PAGE = `<!doctype html><meta charset="utf-8">
-<body style="margin:0"><div id="a" style="width:100vw;height:100vh"></div>
-<script>
-const q = new URLSearchParams(location.search);
-const total = Number(q.get('frames') ?? ${FRAMES});
-const failAt = q.has('fail') ? Number(q.get('fail')) : -1;
-// Models what <Audio> records: stretches of consecutive frames. A page shows frame 0 as soon as it
-// loads, before the renderer has said which frames it wants, and that is recorded too.
-const segments = [];
-let lastFrame = -1;
-function observe(n) {
-	if (n <= lastFrame) return; // each frame is recorded once
-	lastFrame = n;
-	const last = segments[segments.length - 1];
-	const gain = (n + 1) / total;
-	if (last && n === last.startFrame + last.volume.length) last.volume.push(gain);
-	else segments.push({ startFrame: n, volume: [gain] });
-}
-observe(0);
-if (q.has('broken')) {
-	window.__SvelteframeError = 'the page is broken';
-} else {
-	window.__Svelteframe = {
-		config: { fps: ${FPS}, width: 160, height: 90, durationInFrames: total },
-		ready: true,
-		async setFrame(n) {
-			if (n === failAt) throw new Error('boom at frame ' + n);
-			const g = n * 4;
-			document.getElementById('a').style.background = 'rgb(' + g + ',' + g + ',' + g + ')';
-			observe(n);
-			await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-		},
-		// A sound that plays for the whole video, with a volume that rises with the frame.
-		get audio() {
-			if (!q.has('audio')) return [];
-			return segments.map((s) => ({
-				src: location.origin + '/tone.wav',
-				startFrame: s.startFrame,
-				durationInFrames: s.volume.length,
-				sourceStartSeconds: s.startFrame / ${FPS},
-				playbackRate: 1,
-				volume: s.volume
-			}));
-		}
-	};
-}
-</script>`;
-
-let dir: string;
-let server: Server;
-let base: string;
-
-const ffmpeg = (...args: string[]) => {
-	const result = spawnSync('ffmpeg', ['-v', 'error', '-y', ...args]);
-	assert.equal(result.status, 0, result.stderr.toString());
-};
-const page = (query = '') => `${base}/?${query}`;
-const outputOf = (name: string) => join(dir, `${name}.mp4`);
+let fixture: Fixture;
+const page = (query = '') => fixture.page(query);
+const outputOf = (name: string) => join(fixture.dir, `${name}.mp4`);
 const chunkDirs = () => readdirSync(tmpdir()).filter((name) => name.startsWith('svelteframe-chunks-'));
 const leftoverFfmpeg = () => spawnSync('pgrep', ['-f', 'svelteframe-chunks']).stdout.toString().trim();
 
@@ -121,23 +54,9 @@ function decodeAudio(file: string): Int16Array {
 
 describe('renderVideo with several pages', { skip }, () => {
 	before(async () => {
-		dir = await mkdtemp(join(tmpdir(), 'svelteframe-render-test-'));
-		ffmpeg('-f', 'lavfi', '-i', 'sine=f=440:d=3:r=44100', join(dir, 'tone.wav'));
-		server = createServer(async (req, res) => {
-			if (req.url?.startsWith('/tone.wav')) {
-				res.writeHead(200, { 'content-type': 'audio/wav' }).end(await readFile(join(dir, 'tone.wav')));
-			} else {
-				res.writeHead(200, { 'content-type': 'text/html' }).end(PAGE);
-			}
-		}).listen(0, '127.0.0.1');
-		await new Promise((resolve) => server.once('listening', resolve));
-		const address = server.address();
-		base = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
+		fixture = await startFixture();
 	});
-	after(async () => {
-		server.close();
-		await rm(dir, { recursive: true, force: true });
-	});
+	after(() => fixture.close());
 
 	for (const concurrency of [1, 3, 7]) {
 		it(`puts every frame in the right place with ${concurrency} worker(s), with no gaps`, async () => {
@@ -162,6 +81,14 @@ describe('renderVideo with several pages', { skip }, () => {
 			});
 		});
 	}
+
+	it('creates the folders the output is in', async () => {
+		for (const concurrency of [1, 3]) {
+			const output = join(fixture.dir, `nested-${concurrency}`, 'a', 'b', 'video.mp4');
+			await renderVideo({ url: page('frames=6'), output, concurrency });
+			assert.equal(lumaPerFrame(output).length, 6, `concurrency ${concurrency}`);
+		}
+	});
 
 	it('reports progress for every frame, counting up to the total', async () => {
 		const seen: number[] = [];

@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, unlink } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, unlink } from 'node:fs/promises';
 import { once } from 'node:events';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { chromium, type Browser, type Page } from 'playwright';
+import { dirname, join } from 'node:path';
+import { chromium, type Browser } from 'playwright';
 import {
 	clipAudioSegments,
 	mergeAudioSegments,
@@ -13,6 +13,7 @@ import {
 } from './audio.js';
 import { concatChunks } from './chunks.js';
 import { resolveConcurrency, splitFrames, type FrameRange } from './frames.js';
+import { openPage, type BridgeGlobal, type PageHandle } from './page.js';
 
 export interface RenderProgress {
 	/** Frames written so far, across all workers. */
@@ -49,43 +50,10 @@ export interface RenderOptions {
 	signal?: AbortSignal;
 }
 
-interface Bridge {
-	config: { fps: number; width: number; height: number; durationInFrames: number };
-	ready: boolean;
-	setFrame(n: number): Promise<void>;
-	/** What `<Audio>` recorded while frames were rendered. */
-	audio?: unknown;
-}
-
-type BridgeGlobal = { __Svelteframe?: Bridge; __SvelteframeError?: string };
-
 const STDERR_LIMIT = 16 * 1024;
 
-interface Worker {
-	page: Page;
-	/** The first error thrown by the page itself, if any. */
-	pageError: () => Error | undefined;
-}
-
-async function openPage(browser: Browser, url: string): Promise<Worker> {
-	const page = await browser.newPage();
-	let pageError: Error | undefined;
-	page.on('pageerror', (e) => (pageError ??= e));
-
-	await page.goto(url);
-	// The page either exposes the bridge or reports why it cannot (unknown composition, bad props...).
-	await page.waitForFunction(() => {
-		const g = globalThis as BridgeGlobal;
-		return g.__Svelteframe?.ready === true || g.__SvelteframeError !== undefined;
-	});
-	const failure = await page.evaluate(() => (globalThis as BridgeGlobal).__SvelteframeError);
-	if (failure !== undefined) throw new Error(`${url} failed to load: ${failure}`);
-
-	return { page, pageError: () => pageError };
-}
-
 interface RangeJob {
-	worker: Worker;
+	worker: PageHandle;
 	range: FrameRange;
 	/** Where this worker's ffmpeg writes. */
 	output: string;
@@ -181,6 +149,8 @@ export async function renderVideo(opts: RenderOptions): Promise<RenderResult> {
 
 	try {
 		abort.signal.throwIfAborted();
+		// ffmpeg does not create folders.
+		await mkdir(dirname(output), { recursive: true });
 		browser = await chromium.launch({ executablePath: chromiumPath });
 
 		const first = await openPage(browser, url);

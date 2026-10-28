@@ -1,11 +1,12 @@
-import { readFile, unlink } from 'node:fs/promises';
+import { unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { formatBenchmark } from './benchmark.js';
 import { defaultConcurrency } from './frames.js';
 import { renderVideo, type RenderOptions, type RenderProgress } from './render.js';
-import { assertProps, buildRenderUrl } from './url.js';
+import { readPropsFile } from './props-file.js';
+import { buildRenderUrl } from './url.js';
 
 const USAGE = `Usage:
   tsx src/cli.ts --url <page url> [options]
@@ -60,17 +61,7 @@ const output = resolve(cwd, values.out!);
 
 let pageUrl: string;
 try {
-	let props;
-	if (values.props !== undefined) {
-		const file = resolve(cwd, values.props);
-		let parsed: unknown;
-		try {
-			parsed = JSON.parse(await readFile(file, 'utf8'));
-		} catch (err) {
-			throw new Error(`Could not read props from ${file}: ${(err as Error).message}`);
-		}
-		props = assertProps(parsed, file);
-	}
+	const props = values.props !== undefined ? await readPropsFile(resolve(cwd, values.props)) : undefined;
 	pageUrl = buildRenderUrl({ url: values.url, composition: values.composition, props });
 } catch (err) {
 	console.error(err instanceof Error ? err.message : err);
