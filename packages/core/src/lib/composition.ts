@@ -81,3 +81,24 @@ export async function resolveComposition<P extends Record<string, any>>(
 	assertMetadata(metadata, `Composition "${definition.id}" calculateMetadata`);
 	return { props, metadata };
 }
+
+/** What a project reveals about a composition, safe to send as JSON (no component). */
+export interface CompositionInfo extends CompositionMetadata {
+	id: string;
+	defaultProps: Record<string, unknown>;
+	/** True when `calculateMetadata` can change the metadata above depending on the props. */
+	calculatesMetadata: boolean;
+}
+
+/** A listing of compositions for tools like the CLI: `json(describeCompositions(compositions))`. */
+export function describeCompositions(compositions: readonly AnyComposition[]): CompositionInfo[] {
+	return compositions.map((composition) => ({
+		id: composition.id,
+		fps: composition.fps,
+		width: composition.width,
+		height: composition.height,
+		durationInFrames: composition.durationInFrames,
+		defaultProps: composition.defaultProps,
+		calculatesMetadata: composition.calculateMetadata !== undefined
+	}));
+}

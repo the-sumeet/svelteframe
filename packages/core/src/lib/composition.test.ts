@@ -1,6 +1,6 @@
 import type { Component } from 'svelte';
 import { describe, expect, it, vi } from 'vitest';
-import { defineComposition, resolveComposition } from './composition.js';
+import { defineComposition, describeCompositions, resolveComposition } from './composition.js';
 
 // Only the definition's data is under test, so a stand-in component is enough.
 const component = (() => {}) as unknown as Component<{ title: string; seconds: number }>;
@@ -109,5 +109,44 @@ describe('resolveComposition', () => {
 			}
 		});
 		await expect(resolveComposition(failing)).rejects.toThrow('no data');
+	});
+});
+
+describe('describeCompositions', () => {
+	const plain = defineComposition({ ...base, id: 'plain' });
+	const dynamic = defineComposition({
+		...base,
+		id: 'dynamic',
+		defaultProps: { title: 'Hi', seconds: 3 },
+		calculateMetadata: ({ props }) => ({ durationInFrames: props.seconds * 30 })
+	});
+
+	it('lists each composition with its metadata and default props, without the component', () => {
+		const [first] = describeCompositions([plain]);
+		expect(first).toEqual({
+			id: 'plain',
+			fps: 30,
+			width: 1920,
+			height: 1080,
+			durationInFrames: 150,
+			defaultProps: {},
+			calculatesMetadata: false
+		});
+		expect('component' in first).toBe(false);
+	});
+
+	it('flags compositions whose metadata depends on props', () => {
+		expect(describeCompositions([plain, dynamic]).map((c) => c.calculatesMetadata)).toEqual([false, true]);
+		expect(describeCompositions([dynamic])[0].defaultProps).toEqual({ title: 'Hi', seconds: 3 });
+	});
+
+	it('keeps the order and can be serialised', () => {
+		const list = describeCompositions([dynamic, plain]);
+		expect(list.map((c) => c.id)).toEqual(['dynamic', 'plain']);
+		expect(JSON.parse(JSON.stringify(list))).toEqual(list);
+	});
+
+	it('is empty for no compositions', () => {
+		expect(describeCompositions([])).toEqual([]);
 	});
 });

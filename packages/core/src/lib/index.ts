@@ -12,11 +12,13 @@ export {
 export { default as Composition } from './Composition.svelte';
 export {
 	defineComposition,
+	describeCompositions,
 	resolveComposition,
 	type AnyComposition,
 	type CalculateMetadataArgs,
 	type CompositionConfig,
 	type CompositionDefinition,
+	type CompositionInfo,
 	type CompositionMetadata,
 	type ResolvedComposition
 } from './composition.js';
