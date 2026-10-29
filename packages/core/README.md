@@ -1,79 +1,30 @@
-# Svelte library
+# @svelteframe/core
 
-Everything you need to build a Svelte library, powered by [`sv`](https://npmjs.com/package/sv).
+Svelte 5 components and helpers for making video from code: a video is a pure function of the frame number.
 
-Read more about creating a library [in the docs](https://svelte.dev/docs/kit/packaging).
+`Sequence`, `Series`, `Loop` and `Freeze` place parts on the timeline; `interpolate`, `Easing` and `spring` turn frames into values; `Audio` and `OffthreadVideo` add sound and video; `Player` plays a composition live in the browser. A `useVideo()` hook gives any component the current frame.
 
-## Creating a project
+```svelte
+<script lang="ts">
+  import { AbsoluteFill, interpolate, useVideo } from '@svelteframe/core';
 
-If you're seeing this, you've probably already done this step. Congrats!
+  const video = useVideo();
+  const opacity = $derived(interpolate(video.frame, [0, 30], [0, 1]));
+</script>
 
-```sh
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
+<AbsoluteFill style="align-items:center;justify-content:center">
+  <h1 style="opacity:{opacity}">Hello, video</h1>
+</AbsoluteFill>
 ```
 
-To recreate this project with the same configuration:
+The documentation, with live demos and a full reference, lives in `apps/docs` (run `pnpm docs:dev` from the repository root).
+
+This package is not published yet: use it from the workspace.
+
+## Development
 
 ```sh
-# recreate this project
-pnpm dlx sv@1.1.1 create --template library --types ts --install pnpm packages/core
-```
-
-## Adding features
-
-Add features to your project with `sv add`:
-
-```sh
-npx sv add
-```
-
-For example, to add Tailwind CSS:
-
-```sh
-npx sv add tailwindcss
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-Everything inside `src/lib` is part of your library, everything inside `src/routes` can be used as a showcase or preview app.
-
-## Building
-
-To build your library:
-
-```sh
-npm pack
-```
-
-To create a production version of your showcase app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
-
-## Publishing
-
-Go into the `package.json` and give your package the desired name through the `"name"` option. Also consider adding a `"license"` field and point it to a `LICENSE` file which you can create from a template (one popular option is the [MIT license](https://opensource.org/license/mit/)).
-
-To publish your library to [npm](https://www.npmjs.com):
-
-```sh
-npm publish
+pnpm --filter @svelteframe/core build   # svelte-package and publint
+pnpm --filter @svelteframe/core test    # vitest
+pnpm --filter @svelteframe/core check   # svelte-check
 ```

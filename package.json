@@ -9,7 +9,9 @@
     "dev:play": "pnpm --filter playground dev",
     "svelteframe": "svelteframe --root apps/playground",
     "render": "pnpm --filter @svelteframe/renderer exec tsx src/cli.ts",
-    "test": "pnpm -r --if-present test"
+    "test": "pnpm -r --if-present test",
+    "docs:dev": "pnpm --filter @svelteframe/docs dev",
+    "docs:build": "pnpm --filter @svelteframe/docs build"
   },
   "devDependencies": {
     "@svelteframe/cli": "workspace:*"

@@ -214,6 +214,9 @@ Verify: render with background music + a sound effect at frame 60; check sync wi
   - Every shape takes `rotate`, `scale` and `origin` (default the centre), and `progress` (0 to 1) to draw its outline on. A `Line` or `Arrow` with `progress` grows from `from`, the arrowhead going with the tip.
   - Attach by id: give a shape `id="card"`, then `<Arrow from="card" to="dot" />` meets the two edges on the line between their centres. `"card.bottom"` (any of the nine anchor names) is a point of its box; `{ id, anchor, dx, dy }` moves it; a plain `[x, y]` still works, and `gap` leaves space at attached ends. Ends follow shapes that move, rotate or scale. A shape registers as it is created, so the arrow may come before it in the markup; an unknown id fails the render and lists the ids there are. Edges are exact for ellipses and polygons; rounded corners of a `Rect` are ignored.
   - Geometry (`regularPolygon`, `star`, `arrowGeometry`, `shapeTransform`) is pure and exported.
+- ~~Documentation~~ — done, as `apps/docs` (Astro + Starlight, with `@astrojs/svelte` so pages embed live `<Player>` demos). `pnpm docs:dev` / `pnpm docs:build`.
+  - Pages: getting started (installation, first composition, the project contract), concepts, rendering (CLI, Node API, how it works, troubleshooting) and a hand-written reference per package.
+  - Guards: `pnpm --filter @svelteframe/docs test` fails when a package exports a name with no reference heading, when an example imports a name that is not exported, or when a page embeds a demo that does not exist. `check:links` (after a build) checks every internal link and `#fragment`. `pnpm --filter @svelteframe/docs check` type-checks the pages and the Svelte demos.
 - Studio UI: composition sidebar, timeline showing Sequences, props editor.
 - Transitions package (fade, slide, wipe) built on `interpolate` + `spring`.
 - `create-svelteframe` scaffolding template.
