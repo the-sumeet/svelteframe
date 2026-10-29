@@ -3,6 +3,8 @@ import starlight from '@astrojs/starlight';
 import { defineConfig } from 'astro/config';
 
 export default defineConfig({
+	site: process.env.SITE_URL || 'https://the-sumeet.github.io',
+	base: process.env.BASE_PATH || (process.env.GITHUB_PAGES ? '/svelteframe' : undefined),
 	integrations: [
 		svelte(),
 		starlight({
