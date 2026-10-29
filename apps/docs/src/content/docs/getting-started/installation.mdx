@@ -1,66 +1,93 @@
 ---
-title: "Installation"
-description: "Set up the Svelteframe repository, then preview and render the example compositions."
+title: "Installation & Getting Started"
+description: "How to get started with Svelteframe — both in this repository and in a new project."
 sidebar:
   order: 1
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
+import { Aside, Tabs, TabItem, Steps } from '@astrojs/starlight/components';
 
-The packages are not on npm yet, so you work from a clone of the repository. It is a [pnpm](https://pnpm.io) workspace with the packages, a playground app full of example compositions, and this documentation site.
+Svelteframe lets you make videos programmatically using Svelte 5 components. A video is a deterministic function of the current frame number: a headless browser steps frame-by-frame, captures each frame, and `ffmpeg` encodes them into an MP4 video.
 
-## Requirements
+## Prerequisites (System-wide)
 
-- **Node.js 24** (the version the project is developed on).
-- **pnpm 12** (the repository pins it, and pnpm downloads it for you).
-- **ffmpeg** and **ffprobe** on your `PATH`: on macOS, `brew install ffmpeg`.
-- **Chromium for Playwright**, installed once with `pnpm exec playwright install chromium` (the next steps do this).
+Before you begin, ensure you have:
+- **Node.js 22+** (Node 24 recommended)
+- **ffmpeg** installed on your system:
+  - macOS: `brew install ffmpeg`
+  - Linux (Ubuntu/Debian): `sudo apt install ffmpeg`
+  - Windows: `winget install Gyan.FFmpeg`
 
-## Set up
+---
+
+## Getting Started
+
+<Tabs>
+  <TabItem label="Option 1: Quick Start in this Repo (Recommended)">
+
+If you have cloned the Svelteframe repository, everything is already wired up in `apps/playground`. You do **not** need to create any new directory!
 
 <Steps>
 
-1. Install dependencies and build the packages:
-
+1. **Install dependencies and build the workspace:**
    ```sh
    pnpm install
    pnpm build
    ```
 
-   `pnpm build` builds `core`, `shapes`, `renderer` and `cli`, in that dependency order. Run it again after you change a package.
-
-2. Install the browser the renderer drives:
-
+2. **Install Chromium for Playwright (one-time setup for rendering):**
    ```sh
    pnpm --filter @svelteframe/renderer exec playwright install chromium
    ```
 
-3. Start the playground and open the printed address:
-
+3. **Launch the interactive Player in your browser:**
    ```sh
    pnpm dev:play
    ```
+   Open the printed URL (usually `http://localhost:5173`). You will see all example compositions with a timeline scrubber to preview them in real time.
 
-   The home page lists every example composition. Open one to scrub through it in the `Player`.
-
-4. Render one to a video:
-
+4. **Render an MP4 video from the terminal:**
    ```sh
    pnpm svelteframe render main
    ```
-
-   This builds the playground, starts it, renders `main` with several browser pages at once, and writes `main.mp4` in the current directory.
+   This will render the `main` composition into `main.mp4` in your root folder.
 
 </Steps>
 
-<Aside>
-  `pnpm svelteframe …` is a root script that runs the `svelteframe` command against `apps/playground`. See [The command line](/rendering/cli/) for every command and option.
-</Aside>
+  </TabItem>
+  <TabItem label="Option 2: In a New Standalone Project">
 
-## Working on a package
+To use Svelteframe in your own standalone project, create a new SvelteKit app:
 
-`pnpm dev:core` rebuilds `@svelteframe/core` whenever you change it, so the playground sees your edits. Each package has its own `check` and `test` scripts, and `pnpm test` runs them all.
+<Steps>
 
-## Next
+1. **Create your project folder:**
+   ```sh
+   npx sv create my-video-app
+   cd my-video-app
+   ```
 
-[Your first composition](/getting-started/first-composition/) builds a small video from scratch.
+2. **Install Svelteframe packages:**
+   ```sh
+   npm install @svelteframe/core @svelteframe/shapes
+   npm install -D @svelteframe/cli @svelteframe/renderer
+   npx playwright install chromium
+   ```
+
+3. **Create your first video component:**
+   See [Your first composition](/getting-started/first-composition/) to write your component, and [Setting up a project](/getting-started/project-setup/) to wire the render route.
+
+4. **Render with the CLI:**
+   ```sh
+   npx svelteframe render <composition-id>
+   ```
+
+</Steps>
+
+  </TabItem>
+</Tabs>
+
+## Next Steps
+
+- Check out [Your first composition](/getting-started/first-composition/) to see how `useVideo()` and `interpolate()` work.
+- See [Concepts: Time and frames](/concepts/time-and-frames/) to understand the core rendering model.
