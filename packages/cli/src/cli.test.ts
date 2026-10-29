@@ -114,7 +114,7 @@ describe('the svelteframe command', () => {
 			const list = JSON.parse(result.stdout) as { id: string; durationInFrames: number }[];
 			assert.deepEqual(
 				list.map((c) => c.id),
-				['main', 'primitives', 'async', 'audio-demo', 'video-demo', 'title-card']
+				['main', 'primitives', 'async', 'audio-demo', 'video-demo', 'shapes-demo', 'title-card']
 			);
 			assert.match(result.stderr, /Building the project/);
 			assert.doesNotMatch(result.stderr + result.stdout, /adapter-auto/, 'the build output is not shown');
@@ -201,10 +201,27 @@ describe('the svelteframe command', () => {
 			assert.ok(similarity(992, 1.5) > similarity(992, 2) + 0.01, 'the right box is at half speed, not normal');
 		});
 
+		it('still puts shapes where x, y and anchor say, in composition pixels', async () => {
+			const result = await run(['still', 'shapes-demo', '--frame', '70', '--out', 'shapes.png', ...root], work);
+			assert.equal(result.code, 0, result.stderr);
+			const colorAt = (x: number, y: number) =>
+				spawnSync('ffmpeg', ['-v', 'error', '-i', join(work, 'shapes.png'), '-vf', `crop=1:1:${x}:${y},format=rgb24`, '-f', 'rawvideo', '-']).stdout.toString('hex');
+			assert.equal(colorAt(420, 310), 'ff3e00', 'the circle is centred on (420, 310)');
+			assert.equal(colorAt(270, 720), '06d6a0', 'the triangle sits at its top-left corner (160, 600)');
+			assert.equal(colorAt(1380, 310), 'ffd166', 'the star is centred on (1380, 310)');
+			assert.equal(colorAt(174, 968), '06d6a0', 'a shape outside the canvas is where the page puts it');
+			assert.equal(colorAt(100, 100), '0e1116', 'and nothing is drawn elsewhere');
+			assert.equal(colorAt(320, 400), '1d2430', 'the rectangle starts at (160, 160)');
+			assert.equal(colorAt(150, 400), '0e1116', 'and not before it');
+			assert.equal(colorAt(900, 310), '8ab4ff', 'the arrow from "card" to "star" runs along the line between their centres');
+			assert.equal(colorAt(690, 310), '0e1116', 'and starts a gap after the card\'s edge');
+			assert.equal(colorAt(345, 530), '06d6a0', 'the arrow from "card.bottom" to "tri.top" joins those two points');
+		});
+
 		it('render fails with the reason for an unknown composition, leaving no file', async () => {
 			const result = await run(['render', 'nope', '--out', 'nope.mp4', ...root], work);
 			assert.equal(result.code, 1);
-			assert.match(result.stderr, /Unknown composition "nope". Available: main, primitives, async, audio-demo, video-demo, title-card/);
+			assert.match(result.stderr, /Unknown composition "nope". Available: main, primitives, async, audio-demo, video-demo, shapes-demo, title-card/);
 			assert.equal(result.stdout, '');
 			assert.equal(existsSync(join(work, 'nope.mp4')), false);
 		});
@@ -234,7 +251,7 @@ describe('the svelteframe command', () => {
 			const result = await run(['compositions', '--json', '--dev', ...root], work);
 			assert.equal(result.code, 0, result.stderr);
 			assert.match(result.stderr, /Starting the dev server/);
-			assert.equal((JSON.parse(result.stdout) as unknown[]).length, 6);
+			assert.equal((JSON.parse(result.stdout) as unknown[]).length, 7);
 		});
 
 		it('Ctrl-C stops a render, exits 130 and leaves nothing behind', async () => {

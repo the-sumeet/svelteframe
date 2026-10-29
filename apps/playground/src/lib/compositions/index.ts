@@ -3,6 +3,7 @@ import AsyncDemo from './AsyncDemo.svelte';
 import AudioDemo from './AudioDemo.svelte';
 import Main from './Main.svelte';
 import Primitives from './Primitives.svelte';
+import ShapesDemo from './ShapesDemo.svelte';
 import TitleCard from './TitleCard.svelte';
 import VideoDemo from './VideoDemo.svelte';
 
@@ -52,6 +53,15 @@ export const compositions: AnyComposition[] = [
 		height: 1080,
 		durationInFrames: 5 * fps,
 		defaultProps: { sound: true }
+	}),
+	// Shapes on a canvas in composition pixels, and one inline.
+	defineComposition({
+		id: 'shapes-demo',
+		component: ShapesDemo,
+		fps,
+		width: 1920,
+		height: 1080,
+		durationInFrames: 4 * fps
 	}),
 	// Takes input props, and its length follows the `seconds` prop.
 	defineComposition({

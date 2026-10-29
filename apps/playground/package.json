@@ -25,6 +25,7 @@
 		"#lib/*": "./src/lib/*"
 	},
 	"dependencies": {
-		"@svelteframe/core": "workspace:*"
+		"@svelteframe/core": "workspace:*",
+		"@svelteframe/shapes": "workspace:*"
 	}
 }
