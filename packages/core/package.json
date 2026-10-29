@@ -1,6 +1,11 @@
 {
 	"name": "@svelteframe/core",
 	"version": "0.0.1",
+	"description": "Svelte 5 primitives and components for programmatic video rendering",
+	"license": "MIT",
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && pnpm run prepack",
@@ -48,7 +53,11 @@
 		"vitest": "^5.0.5"
 	},
 	"keywords": [
-		"svelte"
+		"svelte",
+		"svelteframe",
+		"video",
+		"animation",
+		"motion-graphics"
 	],
 	"imports": {
 		"#lib": "./src/lib/index.js",

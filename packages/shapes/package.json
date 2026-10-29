@@ -1,6 +1,11 @@
 {
 	"name": "@svelteframe/shapes",
 	"version": "0.0.1",
+	"description": "SVG shapes and connecting arrows for Svelteframe video compositions",
+	"license": "MIT",
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
 		"build": "pnpm run prepack",
 		"watch": "svelte-package --watch",
@@ -48,7 +53,11 @@
 	},
 	"keywords": [
 		"svelte",
-		"svelteframe"
+		"svelteframe",
+		"svg",
+		"shapes",
+		"arrows",
+		"motion-graphics"
 	],
 	"imports": {
 		"#lib": "./src/lib/index.js",

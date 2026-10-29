@@ -11,7 +11,9 @@
     "render": "pnpm --filter @svelteframe/renderer exec tsx src/cli.ts",
     "test": "pnpm -r --if-present test",
     "docs:dev": "pnpm --filter @svelteframe/docs dev",
-    "docs:build": "pnpm --filter @svelteframe/docs build"
+    "docs:build": "pnpm --filter @svelteframe/docs build",
+    "publish:dry-run": "pnpm -r --filter \"./packages/*\" publish --dry-run --access public --no-git-checks",
+    "publish:packages": "pnpm -r --filter \"./packages/*\" publish --access public --no-git-checks"
   },
   "devDependencies": {
     "@svelteframe/cli": "workspace:*"

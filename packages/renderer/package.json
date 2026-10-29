@@ -1,7 +1,11 @@
 {
   "name": "@svelteframe/renderer",
-  "version": "1.0.0",
-  "private": true,
+  "version": "0.0.1",
+  "description": "Headless browser and ffmpeg rendering engine for Svelteframe",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,5 +30,13 @@
     "@types/node": "^26.6.5",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3"
-  }
+  },
+  "keywords": [
+    "svelte",
+    "svelteframe",
+    "video",
+    "renderer",
+    "ffmpeg",
+    "playwright"
+  ]
 }

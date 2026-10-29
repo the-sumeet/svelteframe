@@ -241,7 +241,7 @@ importers:
   packages/cli:
     dependencies:
       '@svelteframe/renderer':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../renderer
     devDependencies:
       '@types/node':

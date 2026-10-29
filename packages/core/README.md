@@ -19,7 +19,13 @@ Svelte 5 components and helpers for making video from code: a video is a pure fu
 
 The documentation, with live demos and a full reference, lives in `apps/docs` (run `pnpm docs:dev` from the repository root).
 
-This package is not published yet: use it from the workspace.
+## Installation
+
+```sh
+npm install @svelteframe/core
+# or
+pnpm add @svelteframe/core
+```
 
 ## Development
 
