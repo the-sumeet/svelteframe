@@ -1,0 +1,71 @@
+---
+title: "Async data and images"
+description: "Hold a frame until data, images or fonts are ready, so a render never captures a half-loaded picture."
+sidebar:
+  order: 5
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+In a preview, loading is easy: show a spinner and update when the data arrives. A render cannot do that. It captures a frame the moment the page says it is ready, so if the data is not there yet, the video has a hole in it.
+
+`delayRender` tells the renderer to **wait**.
+
+## delayRender and continueRender
+
+```svelte
+<script lang="ts">
+  import { continueRender, delayRender, failRender } from '@svelteframe/core';
+
+  interface Item { name: string; value: number }
+  let items = $state<Item[]>([]);
+
+  // Called while the component is created, so the frame cannot be captured before it.
+  const handle = delayRender('loading items');
+
+  fetch('/api/items')
+    .then((response) => response.json())
+    .then((data) => {
+      items = data;
+      continueRender(handle);
+    })
+    .catch((error) => failRender(handle, error));
+</script>
+
+{#each items as item}
+  <p>{item.name}: {item.value}</p>
+{/each}
+```
+
+- `delayRender(label?, { timeoutInMilliseconds? })` returns a handle. The renderer does not capture while any handle is pending.
+- `continueRender(handle)` releases it.
+- `failRender(handle, error)` releases it **and fails the render** with `error`, so a failed request does not silently produce a broken video.
+- If a handle is never released, the render fails after 30 seconds (change it with `timeoutInMilliseconds`) with an error naming the `label`. Give each handle a label that says what it waits for.
+
+<Aside type="caution">
+  Call `delayRender` while the component is being created (in its script), not later in an event or timer: a handle that does not exist yet cannot hold the frame.
+</Aside>
+
+## Images
+
+`Img` is an `<img>` that holds the render until it has loaded and decoded, and fails the render, naming the `src`, if it cannot load.
+
+```svelte
+<script lang="ts">
+  import { Img } from '@svelteframe/core';
+</script>
+
+<Img src="/photo.jpg" alt="The photo" style="width:100%" />
+```
+
+It takes the usual `<img>` attributes. Use it instead of a plain `<img>` in compositions.
+
+## Fonts
+
+The renderer also waits for web fonts to finish loading before it captures a frame, so a `@font-face` or Google Fonts stylesheet in your page works without extra code.
+
+## How the renderer waits
+
+`waitUntilReady()` is what the renderer's `setFrame` calls. It resolves when the DOM is up to date, every handle is released, and fonts are loaded, and it rejects if a handle times out or fails. You rarely call it yourself: it is part of [the bridge](/getting-started/project-setup/#4-the-bridge).
+
+Outside a browser (during server-side rendering) `delayRender` does nothing and `waitUntilReady()` resolves at once.

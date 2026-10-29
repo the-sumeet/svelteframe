@@ -1,0 +1,111 @@
+---
+title: "Your first composition"
+description: "Write a component that reads the current frame, register it, preview it and render it."
+sidebar:
+  order: 2
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import Demo from '~/components/Demo.svelte';
+
+A **composition** is a Svelte component plus the facts about the video it makes: its size, frame rate and length. This page builds one that shows a title popping in.
+
+<Demo name="title" client:only="svelte" />
+
+## 1. The component
+
+The component does not know it is in a video. It asks for the current frame with `useVideo()` and draws what belongs to that frame.
+
+```svelte title="Title.svelte"
+<script lang="ts">
+  import { AbsoluteFill, interpolate, spring, useVideo } from '@svelteframe/core';
+
+  interface Props {
+    title: string;
+    subtitle: string;
+    color: string;
+  }
+
+  let { title, subtitle, color }: Props = $props();
+
+  const video = useVideo();
+
+  // A spring that starts at frame 0, for the pop.
+  const pop = $derived(spring({ frame: video.frame, fps: video.fps, config: { damping: 12 } }));
+  // The subtitle fades in between frames 15 and 35.
+  const fade = $derived(interpolate(video.frame, [15, 35], [0, 0.9]));
+</script>
+
+<AbsoluteFill style="background:{color};color:white;align-items:center;justify-content:center">
+  <h1 style="transform:scale({pop});opacity:{Math.min(1, pop)}">{title}</h1>
+  <p style="opacity:{fade}">{subtitle}</p>
+</AbsoluteFill>
+```
+
+<Aside title="Why $derived?">
+  `video.frame` is reactive state. Wrapping a calculation in `$derived` makes it recompute whenever the frame changes, which is how the picture updates as the video plays or the renderer steps.
+</Aside>
+
+## 2. Register it
+
+`defineComposition` attaches the metadata. The `id` is what you type on the command line and see in URLs.
+
+In this repository, save the component as `apps/playground/src/lib/compositions/Title.svelte` and add the composition to the list in `apps/playground/src/lib/compositions/index.ts` next to the examples that are already there.
+
+```ts title="src/lib/compositions/index.ts"
+import { defineComposition } from '@svelteframe/core';
+import Title from './Title.svelte';
+
+export const compositions = [
+  defineComposition({
+    id: 'title',
+    component: Title,
+    fps: 30,
+    width: 1920,
+    height: 1080,
+    durationInFrames: 75,
+    defaultProps: {
+      title: 'Hello, Svelteframe',
+      subtitle: 'Props change what you see',
+      color: '#ff3e00'
+    }
+  })
+];
+```
+
+`width` and `height` are the size of the video in pixels. The component lays itself out at that size, and the `Player` scales it down to fit the page.
+
+## 3. Preview and render
+
+<Steps>
+
+1. Open the composition in your project's preview route to scrub through it. In the playground, that is `/preview/title` once `pnpm dev:play` is running.
+
+2. Render it:
+
+   ```sh
+   pnpm svelteframe render title
+   ```
+
+3. Change a prop without touching the code by passing a JSON file:
+
+   ```sh
+   echo '{"title":"Another title","color":"#1b3a8a"}' > props.json
+   pnpm svelteframe render title --props props.json --out blue.mp4
+   ```
+
+4. Look at a single frame as an image:
+
+   ```sh
+   pnpm svelteframe still title --frame 40 --out frame-40.png
+   ```
+
+</Steps>
+
+Steps 1 to 4 rely on a few routes that expose your compositions to the renderer. The playground already has them, and [Setting up a project](/getting-started/project-setup/) explains what they must do if you are building your own.
+
+## What to read next
+
+- [Time and frames](/concepts/time-and-frames/) explains `useVideo` and what "a function of the frame" means in practice.
+- [Animation](/concepts/animation/) covers `interpolate`, `Easing` and `spring`.
+- [Props and metadata](/concepts/props/) covers `defaultProps`, `--props` and `calculateMetadata`.

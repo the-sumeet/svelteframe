@@ -1,0 +1,103 @@
+---
+title: "Troubleshooting"
+description: "Common problems when previewing and rendering, and what to do about them."
+sidebar:
+  order: 4
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Errors from a render name what went wrong. This page lists the usual ones.
+
+## The command cannot start
+
+**`No project at <dir>: there is no package.json`**
+
+You ran the command outside a project. Run it in your project, or pass `--root <dir>`.
+
+**`Could not find "vite" in <dir>`**
+
+The project's dependencies are not installed. Run `pnpm install` there. The command uses the project's own Vite.
+
+**`spawn ffmpeg ENOENT`**
+
+`ffmpeg` is not installed, or not on your `PATH`. Install it (on macOS, `brew install ffmpeg`) and check that `ffmpeg -version` and `ffprobe -version` both work.
+
+**`Executable doesn't exist` from Playwright**
+
+Chromium is not installed for Playwright. Run `pnpm exec playwright install chromium` (in this repository, `pnpm --filter @svelteframe/renderer exec playwright install chromium`). Or pass your own browser with `--chromium <path>`.
+
+## The page fails to load
+
+The renderer reports `<url> failed to load: <reason>`, taking the reason from `window.__SvelteframeError`.
+
+**`Unknown composition "x". Available: …`**
+
+There is no composition with that id. The message lists the ones there are.
+
+**`Invalid ?props: …`**
+
+The props were not valid. With `--props`, check that the file holds a JSON **object**.
+
+**`… answered 404. The project needs a route at /svelteframe/compositions.json`**
+
+Only `svelteframe compositions` needs that route. See [Setting up a project](/getting-started/project-setup/#8-the-composition-list-optional).
+
+If the page just never becomes ready and there is no message, the project is not setting `window.__Svelteframe`, or not setting `window.__SvelteframeError` on its error page. Check [the contract](/getting-started/project-setup/).
+
+## A render fails partway
+
+**`delayRender("…") was not continued within 30000ms`**
+
+Something held the frame and never released it. The label says what. Make sure `continueRender(handle)` (or `failRender`) is called on every path, or raise `timeoutInMilliseconds`. See [Async data](/concepts/async-data/).
+
+**`<Img> failed to load "…"`**
+
+An image could not be loaded. Check the URL: a relative path is resolved against the render page.
+
+**`<Arrow> is attached to "x", but no shape has that id`**
+
+A line or arrow names an id that no shape has. The message lists the ids there are. See [Shapes](/concepts/shapes/#arrows-and-lines-that-attach-to-shapes).
+
+**`page.goto: Timeout 30000ms exceeded`, or `page.screenshot: Timeout`**
+
+The machine is overloaded: too many browser pages for the CPU. Lower `--concurrency` (try half) and close other heavy programs.
+
+**A frame is wrong in the video but right in the preview**
+
+Something in it depends on time or is still loading. Derive everything from `video.frame` and hold the frame for data with `delayRender` or `Img`. See [Determinism](/concepts/determinism/).
+
+## The video looks different from the preview
+
+**Everything fills the whole frame**
+
+A [`Sequence`](/concepts/timeline/) or [`Canvas`](/concepts/shapes/) fills its nearest positioned parent. Give the box you want to contain it `position: relative`.
+
+**Text or layout moved**
+
+A preview scales the video to the page, a render captures it at full size. If a layout reads the window size, base it on `video.width` and `video.height` instead.
+
+**Colours look slightly off in another player**
+
+Renders are limited-range BT.709, the standard for video, and tagged as such. Players that ignore the tags can differ from the preview.
+
+## Sound
+
+**No sound in the preview**
+
+Browsers only play sound after the viewer has interacted with the page. Click play once.
+
+**No sound in the render**
+
+The page must run in `mode="render"` (so `Audio` records its segments) and the bridge must expose them as `audio`. See [the bridge](/getting-started/project-setup/#4-the-bridge). A silent video added with `OffthreadVideo` has no sound to mix, which is not an error.
+
+**The sound is out of step**
+
+`startFrom` and `endAt` are in **frames**, not seconds. At 30 fps, `startFrom={30}` skips one second.
+
+## Speed
+
+- Increase `--concurrency` until the CPU is full. The default is half the cores.
+- JPEG frames (the default) are faster than `--png`.
+- Use `svelteframe still` to check one frame instead of rendering the video.
+- Use `--url` with a server that is already running to skip the build.

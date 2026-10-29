@@ -1,0 +1,60 @@
+---
+title: "Audio"
+description: "Add sound with the Audio component: trimming, speed, volume curves and how it reaches the video."
+sidebar:
+  order: 7
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Demo from '~/components/Demo.svelte';
+
+`Audio` plays a sound file as part of the video. It starts when it appears, so wrap it in a [`Sequence`](/concepts/timeline/) to place it in time.
+
+```svelte
+<!-- Background music for the whole video, faded in and out. -->
+<Audio src="/audio/music.wav" volume={musicVolume} />
+
+<!-- A sound effect at frame 60. -->
+<Sequence from={60} durationInFrames={20}>
+  <Audio src="/audio/ding.wav" volume={0.9} />
+</Sequence>
+```
+
+<Demo name="audio-bed" client:only="svelte" />
+
+## Props
+
+| Prop | Default | Meaning |
+| --- | --- | --- |
+| `src` | required | The audio file. A relative path is resolved against the page. |
+| `startFrom` | `0` | Frames of the source to **skip** at the start (a trim). |
+| `endAt` | the end of the file | The frame of the source at which to stop. Must be greater than `startFrom`. |
+| `volume` | `1` | A gain, or a function of the frame. |
+| `playbackRate` | `1` | Speed, with the pitch preserved. Must be greater than 0. |
+
+`startFrom` and `endAt` are in **frames** of the video's frame rate, like everything else: at 30 fps, `startFrom={30}` skips the first second.
+
+### Volume that changes
+
+Give `volume` a function of the frame to fade, duck or pulse. The frame is relative to the enclosing `Sequence`, and the result is a gain: `0` is silent and `1` is the original loudness.
+
+```ts
+// Fade in over half a second, hold, then fade out over the last second.
+const musicVolume = (frame: number) =>
+  interpolate(frame, [0, 15, video.durationInFrames - 30, video.durationInFrames - 1], [0, 0.5, 0.5, 0]);
+```
+
+A preview limits the volume to 0..1 (a browser cannot play louder). A render also allows boosting above 1.
+
+## In a preview and in a render
+
+- **In a preview**, `Audio` plays through the browser, following the `Player`: it plays when the video plays, stays silent while you scrub, and re-syncs if it drifts. Browsers only allow sound after the viewer has interacted with the page, so the first play may need a click.
+- **In a render**, nothing is played. `Audio` records what it *would* play (which file, from which frame, at what speed and volume) and the renderer mixes it with `ffmpeg` after the picture is done, so sound and picture line up to the frame. Volume curves are applied per frame, and several sounds are mixed together.
+
+<Aside title="Limits">
+  The sound is encoded as AAC in an MP4. The `src` is read once when the component is created, so changing it mid-video is not followed in a render.
+</Aside>
+
+## Sound inside timeline components
+
+`Audio` follows the frame it is given. Inside a `Loop` it restarts, and inside a `Freeze` it pauses. A sound whose `Sequence` ends is cut at that frame.

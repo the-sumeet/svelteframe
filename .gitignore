@@ -3,3 +3,4 @@ dist
 .svelte-kit
 out.mp4
 .env*
+.astro

@@ -1,0 +1,134 @@
+---
+title: "Shapes"
+description: "Draw rectangles, circles, lines and arrows with SVG, position them in video pixels, and attach arrows to shapes by id."
+sidebar:
+  order: 9
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Demo from '~/components/Demo.svelte';
+
+`@svelteframe/shapes` draws with SVG: `Rect`, `Circle`, `Ellipse`, `Triangle`, `Polygon`, `Star`, `Line` and `Arrow`. SVG stays crisp at any resolution and has no timing of its own, so shapes are deterministic like everything else.
+
+```svelte
+<script lang="ts">
+  import { Arrow, Canvas, Circle, Rect } from '@svelteframe/shapes';
+</script>
+
+<Canvas>
+  <Rect x={160} y={160} width={520} height={300} radius={32} fill="#1d2430" />
+  <Circle x={900} y={310} radius={80} anchor="center" fill="#ff3e00" />
+  <Arrow from={[680, 310]} to={[820, 310]} stroke="white" strokeWidth={8} />
+</Canvas>
+```
+
+<Demo name="shapes-gallery" client:only="svelte" />
+
+## Canvas
+
+`Canvas` is an `<svg>` the size of the composition. Inside it, every shape is placed in **video pixels with the origin at the top-left**: `x` grows to the right and `y` grows downward. Shapes stack in the order you write them, so later ones are on top.
+
+Like a [`Sequence`](/concepts/timeline/), a `Canvas` fills its nearest positioned parent. It accepts `class` and `style`.
+
+## Positioning: x, y and anchor
+
+`x` and `y` say where a shape goes. The `anchor` says **which point of the shape** goes there. The default is the top-left corner, like CSS. Use `anchor="center"` to centre a shape on a point.
+
+```svelte
+<Rect x={480} y={250} width={150} height={90} anchor="center" />
+```
+
+<Demo name="shapes-anchors" client:only="svelte" />
+
+All three rectangles above have the same `x` and `y` (the white dot). Only the anchor differs. The anchors are `top-left`, `top`, `top-right`, `left`, `center`, `right`, `bottom-left`, `bottom` and `bottom-right`, or an explicit point `[x, y]` measured from the shape's top-left corner.
+
+Each shape has a **box**, and the anchor is a point of it:
+
+| Shape | Its box |
+| --- | --- |
+| `Rect`, `Triangle` | `width` × `height` |
+| `Ellipse` | `2 × rx` by `2 × ry` |
+| `Circle` | the square around it, `2 × radius` |
+| `Polygon`, `Star` | the square around the circle its corners lie on, so `anchor="center"` is its centre |
+| `Line`, `Arrow` | the box around the two ends |
+
+`Line` and `Arrow` are placed by their `from` and `to` points, not by `x` and `y`.
+
+## Outside a Canvas
+
+A shape outside a `Canvas` is an ordinary inline `<svg>` of its own, sized to its box, which the page lays out with CSS. `x`, `y` and `anchor` are ignored there. The SVG has `overflow: visible`, so strokes and rotation are not clipped.
+
+```svelte
+<div style="display:flex;align-items:center;gap:20px">
+  <Circle radius={14} fill="#06d6a0" />
+  <span>shapes are inline too</span>
+</div>
+```
+
+## Looks and movement
+
+Every shape takes these props:
+
+| Prop | Meaning |
+| --- | --- |
+| `fill`, `stroke`, `strokeWidth`, `opacity` | Paint. Left alone, SVG's defaults apply (a black fill, no stroke). `Line` and `Arrow` default to `stroke="currentColor"` and `strokeWidth={4}`. |
+| `strokeLinecap`, `strokeLinejoin` | The ends and corners of strokes. |
+| `rotate` | Degrees, clockwise. |
+| `scale` | A number, or `[x, y]`. |
+| `origin` | What `rotate` and `scale` turn around. Defaults to the shape's centre. Takes the same names as `anchor`, or a point. |
+| `progress` | Draw only this much of the outline, 0 to 1. |
+| `id` | A name arrows can attach to. |
+| `class`, `style` | Passed to the shape's group (or its `<svg>`). |
+
+Animate them like any value: `x={interpolate(frame, [0, 30], [100, 400])}`, `rotate={frame * 4}`.
+
+## Drawing on with progress
+
+`progress` shows only the first part of an outline, from where it starts, so a shape appears to draw itself. It affects the stroke only: a fill is not changed.
+
+```svelte
+<Rect x={80} y={90} width={220} height={140} stroke="#ff3e00" strokeWidth={6} fill="none" {progress} />
+<Arrow from={[520, 440]} to={[880, 340]} stroke="#ef476f" strokeWidth={8} {progress} />
+```
+
+<Demo name="draw-on" client:only="svelte" />
+
+For `Line` and `Arrow`, the line grows from `from` towards `to`. An arrow's head travels with its tip and shrinks to fit while the arrow is still short, so an arrow can grow from nothing. At `progress={0}` nothing is drawn.
+
+## Arrows and lines that attach to shapes
+
+Give a shape an `id`, and an arrow can attach to it. The arrow follows the shape if it moves, rotates or scales.
+
+```svelte
+<Canvas>
+  <Rect id="card" x={90} y={190} width={220} height={160} />
+  <Circle id="dot" x={700} y={y} radius={60} anchor="center" />
+
+  <Arrow from="card" to="dot" gap={12} />
+  <Arrow from="card.bottom" to="dot.bottom" heads="none" />
+</Canvas>
+```
+
+<Demo name="arrows-by-id" client:only="svelte" />
+
+`from` and `to` each accept:
+
+| Form | Meaning |
+| --- | --- |
+| `[x, y]` | A point on the canvas. |
+| `"card"` | The **edge** of the shape facing the other end: the arrow runs along the line between the two centres and stops at each outline. |
+| `"card.bottom"` | A **point of its box**, using any of the nine anchor names. It accounts for rotation and scale. |
+| `{ id: 'card', anchor: 'bottom', dx: 0, dy: 20 }` | An id (with an optional anchor) moved by `dx` and `dy` pixels. |
+
+They can be mixed: `<Arrow from="card" to={[1500, 400]} />`. `gap` leaves space between an end and the shape it is attached to.
+
+Details worth knowing:
+
+- Ids must be unique in a `Canvas` and may not contain dots or spaces. The id is read once, when the shape is created.
+- An arrow can come **before** the shape it names in the markup.
+- Edges are exact for circles, ellipses and polygons. A `Rect`'s rounded corners are ignored when finding its edge.
+- An unknown id fails the render and lists the ids that exist. An unknown anchor lists the valid names. An id used outside a `Canvas` throws, since there is nothing to look it up in.
+
+## Geometry helpers
+
+The geometry behind the shapes is exported as plain functions, which are handy for computing positions yourself: `regularPolygon`, `star`, `arrowGeometry`, `shapeTransform`, `anchorPoint`, `shapeAnchorPoint`, `boundaryToward`, `parseEnd` and `resolveEnds`. See the [shapes reference](/reference/shapes/).

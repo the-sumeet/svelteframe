@@ -1,0 +1,126 @@
+---
+title: "@svelteframe/core: components"
+description: "Props of every component in @svelteframe/core."
+sidebar:
+  order: 1
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+```ts
+import { AbsoluteFill, Audio, Composition, Freeze, Img, Loop, OffthreadVideo, Player, Sequence, Series, SeriesItem } from '@svelteframe/core';
+```
+
+Functions, hooks and types are in [core: functions and types](/reference/core-functions/).
+
+### `AbsoluteFill`
+
+A box that fills its nearest positioned parent (`position: absolute; inset: 0`) and lays out its children in a column (`display: flex; flex-direction: column`).
+
+| Prop | Type | Default | |
+| --- | --- | --- | --- |
+| `style` | `string` | `''` | Extra CSS, appended after the box's own. |
+| `class` | `string` | `''` | A class name. |
+| `children` | `Snippet` | | |
+
+### `Audio`
+
+Plays a sound in a preview, and records it for the renderer to mix in a render. See [Audio](/concepts/audio/).
+
+| Prop | Type | Default | |
+| --- | --- | --- | --- |
+| `src` | `string` | required | The audio file. |
+| `startFrom` | `number` | `0` | Frames of the source to skip. |
+| `endAt` | `number` | end of file | Frame of the source at which to stop. Greater than `startFrom`. |
+| `volume` | `number \| (frame: number) => number` | `1` | A gain, or a function of the frame relative to the enclosing `Sequence`. A preview clamps it to 0..1. |
+| `playbackRate` | `number` | `1` | Greater than 0. Pitch is preserved. |
+
+### `Composition`
+
+Provides a video to everything inside it, and is the box that gets the video's size. The `Player` and the render page use it; you rarely do directly.
+
+| Prop | Type | Default | |
+| --- | --- | --- | --- |
+| `video` | `VideoState` | required | The video context its children read with `useVideo()`. Read once. |
+| `mode` | `'preview' \| 'render'` | `'preview'` | `render` while a renderer captures frames. Read once. |
+| `children` | `Snippet` | required | |
+
+### `Freeze`
+
+Children always see one frame. See [Sequences, Series, Loop and Freeze](/concepts/timeline/#freeze).
+
+| Prop | Type | |
+| --- | --- | --- |
+| `frame` | `number` | The frame the children see. |
+| `children` | `Snippet` | |
+
+### `Img`
+
+An `<img>` that holds the render until it has loaded and decoded, and fails the render if it cannot load. See [Async data](/concepts/async-data/#images).
+
+Takes `src: string` and every attribute of an `<img>`.
+
+### `Loop`
+
+Repeats its children. Inside, `frame` wraps every `durationInFrames`.
+
+| Prop | Type | |
+| --- | --- | --- |
+| `durationInFrames` | `number` | Length of one iteration. A positive, finite number. |
+| `children` | `Snippet` | |
+
+### `OffthreadVideo`
+
+Shows a video file, frame-accurate in a render. See [Video](/concepts/video/).
+
+| Prop | Type | Default | |
+| --- | --- | --- | --- |
+| `src` | `string` | required | The video file. |
+| `startFrom` | `number` | `0` | Frames of the source to skip. |
+| `endAt` | `number` | end of file | Frame of the source at which to stop. |
+| `volume` | `number \| (frame: number) => number` | `1` | As for `Audio`. |
+| `playbackRate` | `number` | `1` | Greater than 0. |
+| `muted` | `boolean` | `false` | Leave out the sound. |
+| `fit` | `'contain' \| 'cover' \| 'fill' \| 'none' \| 'scale-down'` | `'contain'` | CSS `object-fit`. |
+| `class` | `string` | | Applied to the picture element. |
+| `style` | `string` | | Appended to the picture element's style. |
+
+### `Player`
+
+A live, scrubbable preview. See [The Player](/concepts/player/).
+
+| Prop | Type | Default | |
+| --- | --- | --- | --- |
+| `component` | `Component<P>` | required | The root component. |
+| `inputProps` | `P` | | Props passed to `component`. |
+| `fps` | `number` | required | |
+| `width` | `number` | required | |
+| `height` | `number` | required | |
+| `durationInFrames` | `number` | required | |
+| `controls` | `boolean` | `true` | |
+| `loop` | `boolean` | `true` | |
+| `autoplay` | `boolean` | `false` | |
+
+### `Sequence`
+
+Shows its children from a frame, for a number of frames, with their own frame count. See [Sequences, Series, Loop and Freeze](/concepts/timeline/#sequence).
+
+| Prop | Type | Default | |
+| --- | --- | --- | --- |
+| `from` | `number` | `0` | The frame at which the children appear. |
+| `durationInFrames` | `number` | `Infinity` | How many frames they stay. |
+| `children` | `Snippet` | required | Wrapped in an `AbsoluteFill`. |
+
+### `Series`
+
+A container whose `SeriesItem` children play one after another. It takes only `children`.
+
+### `SeriesItem`
+
+One part of a `Series`. It must be inside a `Series`, and items must be written in order.
+
+| Prop | Type | Default | |
+| --- | --- | --- | --- |
+| `durationInFrames` | `number` | required | How long the item lasts. |
+| `offset` | `number` | `0` | Frames to skip after the previous item (or, if negative, to overlap it by). |
+| `children` | `Snippet` | required | |

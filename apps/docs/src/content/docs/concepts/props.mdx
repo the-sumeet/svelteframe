@@ -1,0 +1,72 @@
+---
+title: "Props and metadata"
+description: "Pass input props to a composition, and let them change its length and size."
+sidebar:
+  order: 4
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Demo from '~/components/Demo.svelte';
+
+A composition is a component, so it takes **props**. They let one composition make many videos: a title card for every customer, a chart for every dataset.
+
+<Demo name="title" client:only="svelte" />
+
+## Default props and input props
+
+Declare the defaults in `defineComposition`. Whatever the caller passes (the **input props**) is merged over them.
+
+```ts
+defineComposition({
+  id: 'title',
+  component: Title,
+  fps: 30,
+  width: 1920,
+  height: 1080,
+  durationInFrames: 90,
+  defaultProps: { title: 'Hello', subtitle: 'World', color: '#ff3e00' }
+});
+```
+
+| Where | How input props are given |
+| --- | --- |
+| Command line | `svelteframe render title --props props.json`, a file holding a JSON **object**. |
+| The page's URL | `?props=` with the JSON as base64url (this is what the command line does for you). |
+| The `Player` | `<Player inputProps={{ title: 'Hi' }} … />`. |
+| Code | `resolveComposition(definition, inputProps)`. |
+
+Props must survive JSON, so use strings, numbers, booleans, arrays and plain objects, and not functions or class instances.
+
+`encodeProps` and `decodeProps` convert a props object to and from the `?props=` format:
+
+```ts
+const query = encodeProps({ title: 'Hi' }); // eyJ0aXRsZSI6IkhpIn0
+decodeProps(query); // { title: 'Hi' }
+```
+
+## Changing the length from the props
+
+A video's `fps`, `width`, `height` and `durationInFrames` are normally fixed. When they depend on the props, add `calculateMetadata`. It receives the final props (defaults and input merged) and returns the fields to override, and may be `async`.
+
+```ts
+defineComposition({
+  id: 'title-card',
+  component: TitleCard,
+  fps: 30,
+  width: 1920,
+  height: 1080,
+  durationInFrames: 90, // used when `seconds` is not given
+  defaultProps: { title: 'Hello', seconds: 3 },
+  calculateMetadata: ({ props }) => ({ durationInFrames: Math.round(props.seconds * 30) })
+});
+```
+
+Now `svelteframe render title-card --props short.json` with `{"seconds": 2}` renders 60 frames.
+
+<Aside title="What it can fetch">
+  Because `calculateMetadata` may be `async`, it can load data first, for example the length of a clip. The values must still end up valid: `fps` a positive number, and `width`, `height` and `durationInFrames` positive whole numbers. Anything else throws an error that names the composition.
+</Aside>
+
+## Listing compositions
+
+`describeCompositions(compositions)` turns the list into JSON-safe objects: id, size, frame rate, length, default props, and whether `calculateMetadata` can change them. The command `svelteframe compositions` prints it as a table, and marks lengths that depend on the props with `*`.

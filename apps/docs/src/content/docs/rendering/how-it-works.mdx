@@ -1,0 +1,70 @@
+---
+title: "How rendering works"
+description: "What happens between \"svelteframe render\" and the finished MP4."
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Knowing the pipeline helps when something looks wrong, or when you want it faster.
+
+```
+               ┌──────────── page 1: frames 0–49 ────────────┐
+ your project  │  setFrame(n) → screenshot → ffmpeg → chunk 1 │
+ /render/<id>  ├──────────── page 2: frames 50–99 ───────────┤   concat    mix sound
+ (in Chromium) │  setFrame(n) → screenshot → ffmpeg → chunk 2 │ ─────────►  ───────►  out.mp4
+               ├──────────── page 3: frames 100–149 ─────────┤   (copy)    (ffmpeg)
+               │  setFrame(n) → screenshot → ffmpeg → chunk 3 │
+               └──────────────────────────────────────────────┘
+```
+
+## 1. Open the page
+
+The renderer launches Chromium and opens `<url>/render/<id>`. It waits for the page to expose `window.__Svelteframe` (or to report a failure in `window.__SvelteframeError`) and reads the video's `config`: its size, frame rate and length. The browser window is set to that size, so the page is laid out at the video's real pixels.
+
+## 2. Split the frames
+
+The frames are divided into contiguous ranges of nearly equal size, one for each worker, and every worker opens its own page. The default is half the CPU cores. Each worker is a browser plus an `ffmpeg`, and both are heavy.
+
+Because a frame is a pure function of its number, a worker can start in the middle of the video and show any frame without showing the ones before it. This is why [determinism](/concepts/determinism/) matters.
+
+## 3. Step, capture, encode
+
+For each frame in its range, a worker:
+
+1. calls `setFrame(n)`, which resolves when the screen is ready: the DOM shows frame `n`, every [`delayRender`](/concepts/async-data/) handle is released and fonts are loaded;
+2. takes a screenshot (JPEG, or PNG with `--png`);
+3. writes it to its own `ffmpeg`, which encodes H.264.
+
+Each worker produces a short video file for its range.
+
+## 4. Join
+
+The pieces are concatenated in order without re-encoding (`ffmpeg`'s concat with `-c copy`), so joining costs almost nothing and the seams are exact. With a single worker there is nothing to join.
+
+## 5. Mix the sound
+
+[`Audio`](/concepts/audio/) and [`OffthreadVideo`](/concepts/video/) do not play during a render. Each records **segments**: which file, at which frame it starts, how long it lasts, where in the file it begins, its speed and its volume per frame. After the last frame the renderer collects them from every page:
+
+- each page's recording is cut to the frames that page rendered, and a sound that spans two pages is stitched back together;
+- `ffmpeg` trims, speeds up (keeping the pitch), applies the volume, delays each sound to its frame and mixes them;
+- the picture is copied as it is, and the sound is added as AAC at 192 kbit/s, padded or cut to match the video's length exactly.
+
+A source with no audio track, such as a silent video, is skipped.
+
+## Video frames
+
+For [`OffthreadVideo`](/concepts/video/), the page requests `/__svelteframe/video-frame`. The renderer intercepts that request and answers it with a frame decoded by `ffmpeg`: it downloads each video once, finds its frame rate, and picks the frame that is on screen at the requested time.
+
+## Colour
+
+Screenshots are full-range sRGB. The encoder converts them to **limited-range BT.709** (`yuv420p`) and tags the stream with its primaries, transfer and range, so players show the same colours you saw in the preview.
+
+## Cleanup
+
+If anything fails, or you press Ctrl-C, the renderer stops every worker, kills the `ffmpeg` processes, closes the browser, removes temporary files and leaves no partial output.
+
+<Aside title="Speed">
+  Rendering speed is dominated by capturing frames, so more workers help until the CPU is full. On one 8-core machine, 4 workers rendered about 2.3 to 2.4 times faster than 1, and 8 workers about 3 times. Compositions with heavy CSS (large blurs, big shadows) and `OffthreadVideo` cost more per frame.
+</Aside>

@@ -1,0 +1,124 @@
+---
+title: "The command line"
+description: "Render videos and stills, and list compositions, with the svelteframe command."
+sidebar:
+  order: 1
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+```
+svelteframe render <id> [options]        Render a composition to a video
+svelteframe still <id> [options]         Capture one frame as an image
+svelteframe compositions [options]       List the project's compositions
+```
+
+Run it from your project, or point it at one with `--root`. In this repository the root script `pnpm svelteframe …` does that for the playground: `pnpm svelteframe render main`.
+
+By default each command builds the project with its own Vite, serves the build, does its work against it, and shuts the server down. The project must provide the pages described in [Setting up a project](/getting-started/project-setup/).
+
+Relative paths (`--out`, `--props`, `--root`) are relative to the directory you ran the command in.
+
+## render
+
+Renders a composition to an MP4: H.264 video, plus AAC sound if the composition has any.
+
+```sh
+svelteframe render title
+svelteframe render title --out out/title.mp4 --concurrency 4
+svelteframe render title --props props.json --png
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--out <file>` | `<id>.mp4` | The video to write. Missing folders are created. |
+| `--props <file>` | none | A JSON file with input props. It must hold an object. |
+| `--concurrency <n>` | half the CPU cores | How many browser pages render at once. Never more than the number of frames. |
+| `--quality <0-100>` | `90` | JPEG quality of the captured frames. |
+| `--png` | off | Capture PNG frames instead of JPEG: lossless, but slower. |
+
+It prints progress as it goes, then a summary:
+
+```
+frame 150/150  5.3s  28.2 fps
+Rendered 150 frames with 1 audio segment(s) using 3 workers to /path/to/title.mp4
+```
+
+More workers render faster, up to a point: each is a browser page plus an `ffmpeg`, and both want CPU. The default of half the cores is a safe start; see [Troubleshooting](/rendering/troubleshooting/) to tune it. If a render fails or is cancelled, no output file is left behind.
+
+## still
+
+Captures one frame as an image.
+
+```sh
+svelteframe still title --frame 40 --out frame-40.png
+svelteframe still title --frame=0 --out poster.jpg --quality 95
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `--frame <n>` | `0` | The frame to capture. It must be inside the video (`0` to `durationInFrames - 1`). |
+| `--out <file>` | `<id>.png` | The image to write. The extension picks the format: `.png`, `.jpg` or `.jpeg`. |
+| `--props <file>` | none | A JSON file with input props. |
+| `--quality <0-100>` | `90` | JPEG quality, for `.jpg` files. |
+
+Stills are a quick way to check a frame without rendering the whole video, and to make thumbnails.
+
+## compositions
+
+Lists the project's compositions, read from `/svelteframe/compositions.json`.
+
+```sh
+svelteframe compositions
+```
+
+```
+ID          SIZE       FPS  FRAMES  LENGTH  PROPS
+main        1920×1080  30   150     5.0s    -
+title-card  1920×1080  30   90      3.0s*   title, subtitle, color, seconds
+
+* the length depends on the props
+```
+
+`--json` prints the list as JSON instead, with nothing else on standard output, so you can pipe it. Status messages go to standard error.
+
+## Options for every command
+
+| Option | Meaning |
+| --- | --- |
+| `--root <dir>` | The project. Defaults to the current directory. It must have a `package.json` and its dependencies installed. |
+| `--url <base url>` | Use a server that is already running, instead of starting one. |
+| `--dev` | Start the project's dev server instead of building and previewing. |
+| `--chromium <path>` | Use this Chromium executable instead of Playwright's. |
+| `-h`, `--help` | Show the usage. |
+| `-v`, `--version` | Show the version. |
+
+### Using a server that is already running
+
+`--url` takes the base address of a project that is already being served. It must be a full `http://` or `https://` address.
+
+```sh
+pnpm dev:play # in one terminal
+svelteframe render main --url http://localhost:5173
+```
+
+Nothing is built or started, which is the quickest way to iterate. The command opens `<base url>/render/<id>`, so any server that provides that page works, SvelteKit or not.
+
+### Build or dev server
+
+By default the command builds the project and serves the build. That is slower to start but steady: nothing reloads in the middle of a render. `--dev` uses the dev server, which starts sooner but can reload when it discovers a dependency for the first time, which can interrupt a render.
+
+If two `svelteframe` commands build the same project at once, the second waits for the first to finish building, and says so.
+
+## Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success. |
+| `1` | The work failed. The reason is on standard error. |
+| `2` | The command was written wrongly: an unknown command or option, a missing id, a bad value. |
+| `130` | Interrupted with Ctrl-C. The server, browser and `ffmpeg` are shut down and temporary files removed. |
+
+<Aside type="tip" title="Negative values">
+  A value that starts with `-` looks like another option, so write it as `--frame=-1`. (That particular value is rejected anyway, but the rule applies to any option.)
+</Aside>

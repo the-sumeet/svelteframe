@@ -1,0 +1,65 @@
+---
+title: "Svelteframe"
+description: "Make videos with Svelte 5 components. A video is a pure function of the frame number."
+---
+
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
+import Demo from '~/components/Demo.svelte';
+
+<Demo name="hero" client:only="svelte" autoplay />
+
+Svelteframe lets you make videos out of Svelte 5 components. You describe what the screen looks like **at frame `n`**, and the tools turn that description into an MP4:
+
+1. A headless Chromium opens your composition and steps through its frames.
+2. Each frame is captured as an image.
+3. `ffmpeg` encodes the images (and any audio) into a video.
+
+Because every frame is computed from its number alone, the same composition always renders the same video, on any machine, in any order, in parallel.
+
+```svelte
+<script lang="ts">
+  import { AbsoluteFill, interpolate, useVideo } from '@svelteframe/core';
+
+  const video = useVideo();
+  // 0 at frame 0, 1 at frame 30, and it stays there.
+  const opacity = $derived(interpolate(video.frame, [0, 30], [0, 1]));
+</script>
+
+<AbsoluteFill style="background:#0f1722;color:white;align-items:center;justify-content:center">
+  <h1 style="opacity:{opacity}">Hello, video</h1>
+</AbsoluteFill>
+```
+
+<CardGrid>
+  <Card title="Just Svelte" icon="rocket">
+    Components, runes and CSS. There is no timeline editor and no special syntax: the current frame is a value you read.
+  </Card>
+  <Card title="Preview in the browser" icon="laptop">
+    The `Player` plays, pauses and scrubs a composition live, with sound, in any page.
+  </Card>
+  <Card title="Render from the terminal" icon="seti:shell">
+    `svelteframe render` captures frames in parallel and encodes an MP4 with `ffmpeg`.
+  </Card>
+  <Card title="Deterministic" icon="approve-check">
+    No wall clock, no hidden randomness. Animations are functions of the frame, so renders are reproducible.
+  </Card>
+</CardGrid>
+
+## What is in the box
+
+| Package | What it is for |
+| --- | --- |
+| `@svelteframe/core` | Svelte components and helpers: `Sequence`, `Series`, `interpolate`, `spring`, `Audio`, `OffthreadVideo`, `Player`, ... |
+| `@svelteframe/shapes` | SVG shapes (`Rect`, `Circle`, `Arrow`, ...) on a canvas the size of the video, with arrows that attach to shapes by id. |
+| `@svelteframe/renderer` | The Node API behind rendering: `renderVideo` and `renderStill`. |
+| `@svelteframe/cli` | The `svelteframe` command: `render`, `still` and `compositions`. |
+
+<Aside type="caution" title="Not published yet">
+  The packages are `private` and live in one repository, so for now you use them from a clone. [Installation](/getting-started/installation/) shows how.
+</Aside>
+
+## Where to go next
+
+- New here? Follow [Installation](/getting-started/installation/) and then [Your first composition](/getting-started/first-composition/).
+- Want the big picture first? Read [Time and frames](/concepts/time-and-frames/).
+- Looking for a function or prop? See the [Reference](/reference/core-components/).

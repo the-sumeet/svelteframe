@@ -1,0 +1,173 @@
+---
+title: "@svelteframe/renderer"
+description: "Every function and type exported by @svelteframe/renderer."
+sidebar:
+  order: 4
+---
+
+```ts
+import { renderVideo, renderStill, buildRenderUrl } from '@svelteframe/renderer';
+```
+
+This package is Node-only. It needs `ffmpeg` and `ffprobe` on the `PATH`, and a Chromium that Playwright can launch. The guide is [The Node API](/rendering/api/).
+
+## Rendering
+
+### `renderVideo`
+
+```ts
+async function renderVideo(options: RenderOptions): Promise<RenderResult>
+```
+
+Renders the page at `options.url` into a video file, with several browser pages at once, and mixes in the sound the page recorded. On failure or abort it removes everything it created, including the output file.
+
+### `RenderOptions`
+
+| Field | Type | Default | |
+| --- | --- | --- | --- |
+| `url` | `string` | required | A page exposing `window.__Svelteframe`. |
+| `output` | `string` | required | The video to write. |
+| `onProgress` | `(progress: RenderProgress) => void` | | Called after each frame. |
+| `imageFormat` | `'jpeg' \| 'png'` | `'jpeg'` | |
+| `quality` | `number` | `90` | JPEG quality, 0 to 100. |
+| `chromiumPath` | `string` | | A Chromium executable to use. |
+| `concurrency` | `number` | half the cores | Pages rendering at once. |
+| `signal` | `AbortSignal` | | Aborting stops and cleans up. |
+
+### `RenderProgress`
+
+| Field | Type | |
+| --- | --- | --- |
+| `frame` | `number` | Frames written so far, across all workers. |
+| `total` | `number` | |
+| `elapsedMs` | `number` | Time spent rendering frames so far. |
+| `fps` | `number` | Average rendered frames per second so far. |
+
+### `RenderResult`
+
+`RenderProgress` plus `audioSegments` (stretches of sound mixed in), `concurrency` (pages used) and `wallMs` (everything, from launching the browser to the finished file).
+
+### `renderStill`
+
+```ts
+async function renderStill(options: StillOptions): Promise<StillResult>
+```
+
+Captures one frame as an image.
+
+### `StillOptions`
+
+| Field | Type | Default | |
+| --- | --- | --- | --- |
+| `url` | `string` | required | A page exposing `window.__Svelteframe`. |
+| `output` | `string` | required | The image file. Its extension picks the format. |
+| `frame` | `number` | `0` | A whole number inside the video. |
+| `quality` | `number` | `90` | JPEG quality. |
+| `chromiumPath` | `string` | | |
+| `signal` | `AbortSignal` | | |
+
+### `StillResult`
+
+`{ frame, total, width, height }`: the frame captured, the frames in the video, and its size.
+
+### `ImageFormat`
+
+`'png' | 'jpeg'`.
+
+### `imageFormatFor`
+
+```ts
+function imageFormatFor(output: string): ImageFormat
+```
+
+The format a file name asks for: `.png`, or `.jpg` and `.jpeg` (any case). Throws for any other extension.
+
+## Page addresses and props
+
+### `buildRenderUrl`
+
+```ts
+function buildRenderUrl(options: RenderUrlOptions): string
+```
+
+The page the renderer opens: `<url>/render/<composition>?props=…`, or `url` unchanged when there is no `composition`. Throws if `props` are given without a composition.
+
+### `RenderUrlOptions`
+
+| Field | Type | |
+| --- | --- | --- |
+| `url` | `string` | A page URL, or the project's base URL when `composition` is set. |
+| `composition` | `string` | Use `<url>/render/<composition>`. |
+| `props` | `Props` | Input props, added as `?props=`. Left out when empty. |
+
+### `Props`
+
+`Record<string, unknown>`.
+
+### `encodeProps`
+
+```ts
+function encodeProps(props: Props): string
+```
+
+base64url JSON, the format the page decodes from `?props=`.
+
+### `assertProps`
+
+```ts
+function assertProps(value: unknown, source: string): Props
+```
+
+Returns `value` if it is a plain object. Otherwise throws `<source> must contain a JSON object`.
+
+### `readPropsFile`
+
+```ts
+async function readPropsFile(file: string): Promise<Props>
+```
+
+Reads input props from a JSON file. Errors name the file.
+
+## Splitting the work
+
+### `FrameRange`
+
+`{ start, end }`: a run of consecutive frames, `start` included and `end` not.
+
+### `defaultConcurrency`
+
+```ts
+function defaultConcurrency(cpuCount?: number): number
+```
+
+Half the cores, at least 1.
+
+### `resolveConcurrency`
+
+```ts
+function resolveConcurrency(requested: number | undefined, totalFrames: number, cpuCount?: number): number
+```
+
+The number of workers to use: what was asked for (or the default), never more than the frames. Throws if `requested` is not a positive integer.
+
+### `splitFrames`
+
+```ts
+function splitFrames(total: number, parts: number): FrameRange[]
+```
+
+Splits `total` frames into contiguous ranges that differ in size by at most one, the earlier ones taking the extra frames. More parts than frames gives one frame per range.
+
+## Benchmarking
+
+### `formatBenchmark`
+
+```ts
+function formatBenchmark(before: BenchmarkRun, after: BenchmarkRun): string
+```
+
+A short report comparing a single-worker run with a parallel one.
+
+### `BenchmarkRun`
+
+`{ concurrency, frames, renderMs, wallMs }`: what is worth comparing between two renders of the same video.

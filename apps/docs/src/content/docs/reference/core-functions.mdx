@@ -1,0 +1,388 @@
+---
+title: "@svelteframe/core: functions and types"
+description: "Every function, class and type exported by @svelteframe/core besides the components."
+sidebar:
+  order: 2
+---
+
+Components are in [core: components](/reference/core-components/).
+
+## Time
+
+### `useVideo`
+
+```ts
+function useVideo(): VideoContext
+```
+
+The video the component is in: its facts and the current `frame`, reactive. Inside `Sequence`, `Loop` and `Freeze` the `frame` is their own. Throws outside a composition. See [Time and frames](/concepts/time-and-frames/).
+
+### `VideoContext`
+
+What `useVideo()` returns.
+
+| Field | Type | |
+| --- | --- | --- |
+| `frame` | `number` | The current frame, as seen from here. |
+| `absoluteFrame` | `number` | The composition's frame, unchanged by `Sequence`, `Loop` and `Freeze`. |
+| `fps` | `number` | |
+| `width` | `number` | |
+| `height` | `number` | |
+| `durationInFrames` | `number` | |
+
+### `VideoConfig`
+
+`{ fps, width, height, durationInFrames }`: the facts about a video, and what `VideoContext` extends.
+
+### `VideoState`
+
+```ts
+class VideoState implements VideoContext {
+  constructor(config: VideoConfig);
+  frame: number; // reactive: set it to move through the video
+}
+```
+
+The state of a running video. The `Player` and the render page hold one and set `frame`; pass it to `Composition`.
+
+### `setVideo`
+
+```ts
+function setVideo(context: VideoContext): void
+```
+
+Provides a video to the components below the current one. `Composition` calls it for you. Call it only when you build a timeline component of your own.
+
+### `createChildVideo`
+
+```ts
+function createChildVideo(
+  parent: VideoContext,
+  frame: () => number,
+  durationInFrames?: () => number
+): VideoContext
+```
+
+A view of `parent` with its own `frame` (and optionally its own length). This is how `Sequence`, `Loop` and `Freeze` work: call it with the new frame, then `setVideo` the result.
+
+## Animation
+
+### `interpolate`
+
+```ts
+function interpolate(
+  input: number,
+  inputRange: readonly number[],
+  outputRange: readonly number[],
+  options?: InterpolateOptions
+): number
+```
+
+Maps `input` from `inputRange` onto `outputRange`, in straight lines between the points. The ranges must be the same length (at least 2), finite, with a strictly increasing `inputRange`. Throws if `input` is `NaN`. See [Animation](/concepts/animation/#interpolate).
+
+### `InterpolateOptions`
+
+| Field | Type | Default | |
+| --- | --- | --- | --- |
+| `extrapolateLeft` | `ExtrapolateType` | `'clamp'` | Below the first input. |
+| `extrapolateRight` | `ExtrapolateType` | `'clamp'` | Above the last input. |
+| `easing` | `EasingFunction` | linear | Applied to the 0..1 progress in each segment. |
+
+### `ExtrapolateType`
+
+`'clamp' | 'extend' | 'identity'`.
+
+### `Easing`
+
+An object of easing functions and builders.
+
+| Member | |
+| --- | --- |
+| `Easing.linear` | Constant speed. |
+| `Easing.ease` | CSS `ease`. |
+| `Easing.quad` | `t * t`. |
+| `Easing.cubic` | `t * t * t`. |
+| `Easing.bezier(x1, y1, x2, y2)` | A CSS `cubic-bezier()`. Throws a `RangeError` unless `x1` and `x2` are between 0 and 1. |
+| `Easing.in(fn)` | `fn` as it is. |
+| `Easing.out(fn)` | `fn` mirrored, so it eases out. |
+| `Easing.inOut(fn)` | In for the first half, out for the second. |
+
+### `EasingFunction`
+
+`(t: number) => number`: maps progress from 0..1 to 0..1.
+
+### `spring`
+
+```ts
+function spring(options: SpringOptions): number
+```
+
+Progress of a damped spring released from rest, from `from` (at frame 0 and before) towards `to`. A closed-form, deterministic function of the frame. See [Animation](/concepts/animation/#spring).
+
+### `SpringOptions`
+
+| Field | Type | Default | |
+| --- | --- | --- | --- |
+| `frame` | `number` | required | Must not be `NaN`. |
+| `fps` | `number` | required | Greater than 0. |
+| `config` | `Partial<SpringConfig>` | `defaultSpringConfig` | |
+| `from` | `number` | `0` | |
+| `to` | `number` | `1` | |
+| `durationInFrames` | `number` | none | Stretch the motion to settle exactly at this frame. Greater than 0. |
+
+### `SpringConfig`
+
+`{ damping, mass, stiffness }`. `mass` and `stiffness` must be greater than 0 and `damping` at least 0.
+
+### `defaultSpringConfig`
+
+`{ damping: 10, mass: 1, stiffness: 100 }`.
+
+### `measureSpring`
+
+```ts
+function measureSpring(options: { fps: number; config?: Partial<SpringConfig> }): number
+```
+
+The number of frames after which the spring stays within a small threshold of its target. Capped at 60 seconds' worth of frames for springs that never settle.
+
+### `random`
+
+```ts
+function random(seed: number | string): number
+```
+
+A number from 0 up to (not including) 1, the same every time for a seed. `random(1) === random('1')`. Throws for a seed that is not a finite number or a string. See [Determinism](/concepts/determinism/#seeded-randomness).
+
+## Compositions
+
+### `defineComposition`
+
+```ts
+function defineComposition<P>(config: CompositionConfig<P>): CompositionDefinition<P>
+```
+
+Declares a video that can be previewed and rendered by id. Throws if the `id` has characters other than letters, digits, `-` and `_`, or if `fps` is not a positive number, or `width`, `height` or `durationInFrames` is not a positive integer.
+
+### `CompositionConfig`
+
+| Field | Type | |
+| --- | --- | --- |
+| `id` | `string` | Letters, digits, `-` and `_`. |
+| `component` | `Component<P>` | The root component. |
+| `fps`, `width`, `height`, `durationInFrames` | `number` | See `CompositionMetadata`. |
+| `defaultProps` | `P` | Optional. Input props are merged over it. |
+| `calculateMetadata` | `(args: CalculateMetadataArgs<P>) => Partial<CompositionMetadata> \| Promise<…>` | Optional. Override the metadata from the final props. |
+
+### `CompositionMetadata`
+
+`{ fps, width, height, durationInFrames }`.
+
+### `CalculateMetadataArgs`
+
+`{ props }`: the default props with the input props merged over them.
+
+### `CompositionDefinition`
+
+What `defineComposition` returns: a `CompositionConfig` whose `defaultProps` is always present (`{}` when none were given).
+
+### `AnyComposition`
+
+`CompositionDefinition<any>`: the type of a list of compositions with different props.
+
+### `resolveComposition`
+
+```ts
+async function resolveComposition<P>(
+  definition: CompositionDefinition<P>,
+  inputProps?: Partial<P> | Record<string, unknown>
+): Promise<ResolvedComposition<P>>
+```
+
+Merges `inputProps` over the defaults, then applies `calculateMetadata` over the declared metadata and checks the result. See [Props and metadata](/concepts/props/).
+
+### `ResolvedComposition`
+
+`{ props, metadata }`: the final props and the final `CompositionMetadata`.
+
+### `describeCompositions`
+
+```ts
+function describeCompositions(compositions: readonly AnyComposition[]): CompositionInfo[]
+```
+
+A JSON-safe listing, for serving at `/svelteframe/compositions.json`.
+
+### `CompositionInfo`
+
+`{ id, fps, width, height, durationInFrames, defaultProps, calculatesMetadata }`. `calculatesMetadata` is `true` when `calculateMetadata` can change the size or length depending on the props.
+
+### `encodeProps`
+
+```ts
+function encodeProps(props: Record<string, unknown>): string
+```
+
+Encodes props as base64url JSON, for the `?props=` query parameter.
+
+### `decodeProps`
+
+```ts
+function decodeProps(encoded: string): Record<string, unknown>
+```
+
+The reverse. Throws a descriptive error for text that is not base64url UTF-8, is not JSON, or is not an object.
+
+## Waiting for things
+
+See [Async data and images](/concepts/async-data/).
+
+### `delayRender`
+
+```ts
+function delayRender(label?: string, options?: DelayRenderOptions): RenderHandle
+```
+
+Holds the render until `continueRender(handle)`. Call it while a component is created. If it is never released the render fails after the timeout, naming `label`.
+
+### `continueRender`
+
+```ts
+function continueRender(handle: RenderHandle): void
+```
+
+Releases a handle. Releasing twice, or after a failure, does nothing.
+
+### `failRender`
+
+```ts
+function failRender(handle: RenderHandle, error: Error): void
+```
+
+Releases a handle and fails the render with `error`. The error is thrown from the next (or current) `waitUntilReady()`, and logged when nothing is waiting.
+
+### `waitUntilReady`
+
+```ts
+async function waitUntilReady(): Promise<void>
+```
+
+Resolves when the DOM is up to date, every handle is released and fonts have loaded. Rejects when a handle times out or fails. Used by the bridge's `setFrame`.
+
+### `DelayRenderOptions`
+
+`{ timeoutInMilliseconds?: number }`: how long the handle may stay pending. Default `30000`.
+
+### `RenderHandle`
+
+`number`: identifies one pending piece of work.
+
+## Environment
+
+### `useRenderMode`
+
+```ts
+function useRenderMode(): RenderMode
+```
+
+`'render'` while a renderer captures frames, `'preview'` otherwise (also outside a `Composition`).
+
+### `setRenderMode`
+
+```ts
+function setRenderMode(mode: RenderMode): void
+```
+
+Provides the mode to the components below. `Composition` calls it.
+
+### `RenderMode`
+
+`'preview' | 'render'`.
+
+### `usePlayback`
+
+```ts
+function usePlayback(): Playback
+```
+
+Whether the `Player` is playing, so media can follow it. Outside a `Player` it is `{ playing: false }`.
+
+### `setPlayback`
+
+```ts
+function setPlayback(playback: Playback): void
+```
+
+Provides playback state to the components below. The `Player` calls it.
+
+### `Playback`
+
+`{ readonly playing: boolean }`.
+
+## Audio recording
+
+These are the parts `Audio` and the renderer are built from. You only need them to build a sound component of your own, or to write a bridge.
+
+### `getAudioManifest`
+
+```ts
+function getAudioManifest(): AudioSegment[]
+```
+
+Every sound segment recorded on this page, ordered by start frame. The bridge returns it as `audio`, and the renderer reads it after the last frame.
+
+### `AudioSegment`
+
+One continuous stretch of a sound to place in the final video.
+
+| Field | Type | |
+| --- | --- | --- |
+| `src` | `string` | Absolute URL of the file. |
+| `startFrame` | `number` | Video frame at which it starts. |
+| `durationInFrames` | `number` | How many video frames it lasts. |
+| `sourceStartSeconds` | `number` | Where in the file it starts. |
+| `playbackRate` | `number` | 1 is normal speed. |
+| `volume` | `number \| number[]` | A gain, or one value per frame. May exceed 1. |
+
+### `createAudioRecorder`
+
+```ts
+function createAudioRecorder(options: AudioRecorderOptions): AudioRecorder
+```
+
+Makes a recorder whose segments appear in `getAudioManifest()`. Recorders are kept after their component unmounts, because a `Sequence` removes its sound as soon as it ends but the renderer reads the manifest after the last frame.
+
+### `AudioRecorder`
+
+```ts
+class AudioRecorder {
+  constructor(options: AudioRecorderOptions);
+  observe(observation: Observation): void;
+  segments(): AudioSegment[];
+}
+```
+
+Watches one sound frame by frame and groups the frames where it advances in step with the composition into segments. A jump back (a `Loop` wrapping) starts a new segment, and a frame where local time stands still (a `Freeze`) ends one.
+
+### `AudioRecorderOptions`
+
+`{ src, startFromSeconds, playbackRate, fps }`.
+
+### `Observation`
+
+What a recorder is told about each frame.
+
+| Field | Type | |
+| --- | --- | --- |
+| `localFrame` | `number` | The frame on the sound's own timeline. |
+| `absoluteFrame` | `number` | The composition's frame. |
+| `active` | `boolean` | `false` when the sound is not due to play, for example past `endAt`. |
+| `volume` | `number` | The gain. |
+
+### `resetAudioManifest`
+
+```ts
+function resetAudioManifest(): void
+```
+
+Forgets everything recorded so far. Mostly for tests.

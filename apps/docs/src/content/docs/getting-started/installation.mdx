@@ -1,0 +1,66 @@
+---
+title: "Installation"
+description: "Set up the Svelteframe repository, then preview and render the example compositions."
+sidebar:
+  order: 1
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+The packages are not on npm yet, so you work from a clone of the repository. It is a [pnpm](https://pnpm.io) workspace with the packages, a playground app full of example compositions, and this documentation site.
+
+## Requirements
+
+- **Node.js 24** (the version the project is developed on).
+- **pnpm 12** (the repository pins it, and pnpm downloads it for you).
+- **ffmpeg** and **ffprobe** on your `PATH`: on macOS, `brew install ffmpeg`.
+- **Chromium for Playwright**, installed once with `pnpm exec playwright install chromium` (the next steps do this).
+
+## Set up
+
+<Steps>
+
+1. Install dependencies and build the packages:
+
+   ```sh
+   pnpm install
+   pnpm build
+   ```
+
+   `pnpm build` builds `core`, `shapes`, `renderer` and `cli`, in that dependency order. Run it again after you change a package.
+
+2. Install the browser the renderer drives:
+
+   ```sh
+   pnpm --filter @svelteframe/renderer exec playwright install chromium
+   ```
+
+3. Start the playground and open the printed address:
+
+   ```sh
+   pnpm dev:play
+   ```
+
+   The home page lists every example composition. Open one to scrub through it in the `Player`.
+
+4. Render one to a video:
+
+   ```sh
+   pnpm svelteframe render main
+   ```
+
+   This builds the playground, starts it, renders `main` with several browser pages at once, and writes `main.mp4` in the current directory.
+
+</Steps>
+
+<Aside>
+  `pnpm svelteframe …` is a root script that runs the `svelteframe` command against `apps/playground`. See [The command line](/rendering/cli/) for every command and option.
+</Aside>
+
+## Working on a package
+
+`pnpm dev:core` rebuilds `@svelteframe/core` whenever you change it, so the playground sees your edits. Each package has its own `check` and `test` scripts, and `pnpm test` runs them all.
+
+## Next
+
+[Your first composition](/getting-started/first-composition/) builds a small video from scratch.

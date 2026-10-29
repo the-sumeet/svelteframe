@@ -1,0 +1,73 @@
+---
+title: "The Node API"
+description: "Render videos and stills from your own scripts with @svelteframe/renderer."
+sidebar:
+  order: 2
+---
+
+The command line is a thin layer over `@svelteframe/renderer`. Use the package directly when you want to render from a script, a server or a test. It does not start a server for you: you give it the **URL of a render page** (see [Setting up a project](/getting-started/project-setup/)).
+
+## renderVideo
+
+```ts
+import { buildRenderUrl, renderVideo } from '@svelteframe/renderer';
+
+const result = await renderVideo({
+  url: buildRenderUrl({ url: 'http://localhost:5173', composition: 'title', props: { title: 'Hi' } }),
+  output: 'out/title.mp4',
+  concurrency: 4,
+  onProgress: ({ frame, total, fps }) => console.log(`${frame}/${total} at ${fps.toFixed(1)} fps`)
+});
+
+console.log(`${result.frame} frames in ${(result.wallMs / 1000).toFixed(1)}s`);
+```
+
+`buildRenderUrl` makes the page address: `<url>/render/<composition>?props=…`. Pass a complete page URL as `url` and no `composition` to use it as it is.
+
+### Options
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `url` | required | The render page. |
+| `output` | required | The video file. Missing folders are created. |
+| `onProgress` | none | Called after each frame with `{ frame, total, elapsedMs, fps }`. |
+| `imageFormat` | `'jpeg'` | `'jpeg'` or `'png'` frames. |
+| `quality` | `90` | JPEG quality, 0 to 100. Ignored for PNG. |
+| `chromiumPath` | Playwright's Chromium | A Chromium executable to use instead. |
+| `concurrency` | half the CPU cores | Pages rendering at once. |
+| `signal` | none | An `AbortSignal`. Aborting stops the render and cleans up the browser, `ffmpeg` and temporary files. |
+
+### Result
+
+`renderVideo` resolves with the last progress values plus:
+
+| Field | Meaning |
+| --- | --- |
+| `audioSegments` | How many stretches of sound were mixed in. |
+| `concurrency` | How many pages rendered. |
+| `wallMs` | Everything, from launching the browser to the finished file. |
+
+It rejects with the reason on failure, and leaves no output file when it does. An aborted render rejects with an `AbortError`.
+
+## renderStill
+
+```ts
+import { buildRenderUrl, renderStill } from '@svelteframe/renderer';
+
+const { frame, total, width, height } = await renderStill({
+  url: buildRenderUrl({ url: 'http://localhost:5173', composition: 'title' }),
+  output: 'poster.png',
+  frame: 40
+});
+```
+
+The extension of `output` picks the format (`.png`, `.jpg`, `.jpeg`), and `imageFormatFor(output)` tells you which. `frame` defaults to `0` and must be inside the video. Options `quality`, `chromiumPath` and `signal` work as above.
+
+## Props and other helpers
+
+- `readPropsFile(file)` reads a JSON props file, with errors that name the file.
+- `encodeProps(props)` and `assertProps(value, source)` handle the `?props=` format.
+- `defaultConcurrency()`, `resolveConcurrency(requested, totalFrames)` and `splitFrames(total, parts)` are the pieces that decide how a render is split.
+- `formatBenchmark(before, after)` formats a comparison of two runs.
+
+All are listed in the [renderer reference](/reference/renderer/).

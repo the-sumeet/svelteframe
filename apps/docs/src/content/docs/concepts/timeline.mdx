@@ -1,0 +1,83 @@
+---
+title: "Sequences, Series, Loop and Freeze"
+description: "Place parts of a video on the timeline and change the frame a part sees."
+sidebar:
+  order: 2
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Demo from '~/components/Demo.svelte';
+
+A real video has parts that start and stop at different times. These four components move parts around the timeline. Each gives its children a **new `video.frame`**, so a child can be written as if it starts at frame 0 and be placed anywhere.
+
+## Sequence
+
+`Sequence` shows its children from frame `from` for `durationInFrames`. Outside that range the children are not rendered at all. Inside, `useVideo().frame` counts from the start of the sequence.
+
+```svelte
+<Sequence from={0} durationInFrames={60}>
+  <Card label="first" />
+</Sequence>
+<Sequence from={30} durationInFrames={60}>
+  <Card label="second" />
+</Sequence>
+<Sequence from={60}>
+  <Card label="until the end" />
+</Sequence>
+```
+
+<Demo name="sequences" client:only="svelte" />
+
+Watch the **local frame** in each card: it restarts at 0 when its sequence begins. A card's fade-in uses `interpolate(video.frame, [0, 10], [0, 1])` and works wherever the card is placed.
+
+| Prop | Default | Meaning |
+| --- | --- | --- |
+| `from` | `0` | The frame at which the children appear. |
+| `durationInFrames` | `Infinity` | How many frames they stay. |
+
+<Aside type="caution" title="A Sequence fills its nearest positioned parent">
+  `Sequence` wraps its children in an [`AbsoluteFill`](/reference/core-components/#absolutefill), which is `position: absolute` with `inset: 0`. To keep a sequence inside a box smaller than the video, give that box `position: relative` (and usually a size and `overflow: hidden`). Without it, the sequence covers the whole composition.
+</Aside>
+
+## Series
+
+`Series` lays items out one after another, so you give each a length and not a start frame. `SeriesItem` takes the frame where the previous one ended.
+
+```svelte
+<Series>
+  <SeriesItem durationInFrames={40}><Slide title="One" /></SeriesItem>
+  <SeriesItem durationInFrames={40}><Slide title="Two" /></SeriesItem>
+  <!-- A negative offset overlaps the previous item by 10 frames. -->
+  <SeriesItem durationInFrames={50} offset={-10}><Slide title="Three" /></SeriesItem>
+</Series>
+```
+
+<Demo name="series" client:only="svelte" />
+
+`offset` shifts the start relative to the end of the previous item: positive leaves a gap, negative overlaps (useful for transitions). Items must be written in order, front to back, and a `SeriesItem` outside a `Series` throws.
+
+## Loop
+
+`Loop` repeats its children every `durationInFrames`. Inside, `frame` wraps from `durationInFrames - 1` back to `0`, and `durationInFrames` is the length of one iteration.
+
+```svelte
+<Loop durationInFrames={20}>
+  <Pulse />
+</Loop>
+```
+
+## Freeze
+
+`Freeze` makes its children always see one frame, whatever the time is. Use it to hold a moment, for example the last frame of an animation while something else plays.
+
+```svelte
+<Freeze frame={10}>
+  <Pulse />
+</Freeze>
+```
+
+<Demo name="loop-freeze" client:only="svelte" />
+
+## Sound follows the timeline
+
+An [`Audio`](/concepts/audio/) or [`OffthreadVideo`](/concepts/video/) inside any of these follows the frame it is given: it starts with its sequence, repeats with its loop, and holds still in a freeze.

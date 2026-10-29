@@ -1,0 +1,57 @@
+---
+title: "Determinism"
+description: "The rules that keep a render reproducible, and the tools to follow them."
+sidebar:
+  order: 6
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Demo from '~/components/Demo.svelte';
+
+A render only works if frame `n` looks the same every time and in any order. Svelteframe cannot enforce that. It is the rule you follow when writing compositions.
+
+**Everything you draw is derived from `video.frame` (and props).**
+
+## Do not use the wall clock
+
+These all depend on real time, so they would look different on every render and cannot be stepped frame by frame:
+
+| Avoid | Use instead |
+| --- | --- |
+| `Date.now()`, `performance.now()`, `setTimeout` for animation | `video.frame / video.fps` |
+| `Math.random()` | `random(seed)` |
+| `transition:` and `animate:` directives | `interpolate` and `spring` |
+| `tweened` and `spring` from `svelte/motion` | `interpolate` and `spring` from `@svelteframe/core` |
+| CSS `animation` and `transition` | `interpolate` and `spring`, written into `style` |
+| `requestAnimationFrame` loops | the frame, which already changes |
+
+## Seeded randomness
+
+`random(seed)` returns a number from 0 up to (not including) 1. The same seed always gives the same number, so you can have "random" scatter that is identical on every frame and every render. A number and its string form are the same seed: `random(1) === random('1')`.
+
+```svelte
+<script lang="ts">
+  import { random } from '@svelteframe/core';
+
+  // 36 dots in fixed random places.
+  const dots = Array.from({ length: 36 }, (_, i) => ({
+    x: random(`x${i}`) * 900,
+    y: random(`y${i}`) * 480
+  }));
+</script>
+```
+
+<Demo name="random" client:only="svelte" />
+
+Give each value its own seed (`x${i}`, `y${i}`) so they do not move together. To make something change over time, put the frame in the seed: `random('wobble' + video.frame)`.
+
+## Other things to watch
+
+- **Derive, do not accumulate.** A counter that goes up each frame breaks when frames are skipped, repeated or rendered in parallel.
+- **Wait for data.** Network requests and images must hold the render with [`delayRender` or `Img`](/concepts/async-data/).
+- **Stable data.** If a request returns different answers each time (the current time, a random sample), the video will too. Fetch once, or pass the data in as a prop.
+- **Animations in third-party components.** A component that animates with CSS or timers will not stay in step with the frame.
+
+## Preview and render modes
+
+A composition runs in one of two modes: `preview` for people and `render` while the renderer captures. Most code never needs to care, but you can read it with `useRenderMode()`: the built-in [`Audio`](/concepts/audio/) and [`OffthreadVideo`](/concepts/video/) use it to play in a preview and to describe what they would play in a render.

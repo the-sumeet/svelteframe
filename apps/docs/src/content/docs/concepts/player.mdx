@@ -1,0 +1,55 @@
+---
+title: "The Player"
+description: "Embed a live, scrubbable preview of a composition in any Svelte page."
+sidebar:
+  order: 10
+---
+
+import Demo from '~/components/Demo.svelte';
+
+The `Player` plays a composition in the browser: play, pause, scrub, with sound. Every demo on these pages is a `Player`.
+
+<Demo name="sequences" client:only="svelte" />
+
+```svelte
+<script lang="ts">
+  import { Player } from '@svelteframe/core';
+  import Title from './Title.svelte';
+</script>
+
+<Player
+  component={Title}
+  inputProps={{ title: 'Hello', subtitle: 'World', color: '#ff3e00' }}
+  fps={30}
+  width={1920}
+  height={1080}
+  durationInFrames={75}
+/>
+```
+
+## Props
+
+| Prop | Default | Meaning |
+| --- | --- | --- |
+| `component` | required | The root component of the video. |
+| `inputProps` | none | Props passed to `component`. |
+| `fps`, `width`, `height`, `durationInFrames` | required | The video's metadata. A composition's metadata comes straight from `resolveComposition`: `<Player component={…} inputProps={props} {...metadata} />`. |
+| `controls` | `true` | Show the play button, scrubber and time. |
+| `loop` | `true` | Start again at the end. Otherwise it stops on the last frame. |
+| `autoplay` | `false` | Start playing when mounted. |
+
+The Player scales the composition to the width of its box, keeping the aspect ratio. The composition itself still lays out at its real size.
+
+## Playing and keyboard
+
+Playback is anchored to the clock, so a video plays at its real speed whatever the display's refresh rate. Click the picture, or press `Space`, to play and pause. `←` and `→` step one frame, and `Shift` with an arrow steps one second. The Player must have focus for the keys to work.
+
+When `fps`, `width`, `height` or `durationInFrames` change, the Player starts over with the new shape.
+
+## Sound
+
+[`Audio`](/concepts/audio/) and [`OffthreadVideo`](/concepts/video/) follow the Player: they play when it plays, are silent while you scrub, and stay in sync. Browsers only allow sound after the viewer has interacted with the page.
+
+## Browser only
+
+The Player measures its box and uses the browser's animation timing. It is safe to server-render: until it has measured itself in the browser it stays hidden, so it never flashes at full size. In Astro, mount it with `client:only="svelte"`, as these pages do.

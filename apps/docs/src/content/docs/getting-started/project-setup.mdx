@@ -1,0 +1,232 @@
+---
+title: "Setting up a project"
+description: "The routes and the browser bridge a project provides so the renderer and the command line can use its compositions."
+sidebar:
+  order: 3
+---
+
+import { Aside, FileTree } from '@astrojs/starlight/components';
+
+The renderer does not import your code. It opens a **page** in a headless browser, so your project only has to offer pages that follow a small contract. The playground app in this repository is a complete, working example (a SvelteKit app), and everything below is adapted from it.
+
+<FileTree>
+
+- apps/playground/src
+  - lib
+    - compositions
+      - index.ts the list of compositions
+      - load.ts finds a composition and works out its props and size
+    - bridge.ts exposes `window.__Svelteframe`
+  - routes
+    - render/\[id\]/+page.svelte what the renderer opens
+    - preview/\[id\]/+page.svelte what a person opens
+    - svelteframe/compositions.json/+server.ts what `svelteframe compositions` reads
+    - +error.svelte reports failures to the renderer
+
+</FileTree>
+
+## The contract in one table
+
+| What | Where | Used by |
+| --- | --- | --- |
+| A page per composition that renders it, with no chrome around it | `/render/<id>` | `render`, `still` |
+| `window.__Svelteframe`, once the page is ready | that page | `render`, `still` |
+| `?props=<base64url JSON>` changes the input props | that page | `--props` |
+| A JSON list of compositions | `/svelteframe/compositions.json` | `compositions` (optional) |
+| `window.__SvelteframeError` when the page cannot work | any page | `render`, `still` |
+
+## 1. A registry of compositions
+
+Keep every `defineComposition(...)` result in one array, with a lookup by id. See [Your first composition](/getting-started/first-composition/) for `defineComposition`.
+
+```ts title="src/lib/compositions/index.ts"
+import { defineComposition, type AnyComposition } from '@svelteframe/core';
+import Title from './Title.svelte';
+
+export const compositions: AnyComposition[] = [
+  defineComposition({ id: 'title', component: Title, fps: 30, width: 1920, height: 1080, durationInFrames: 75 })
+];
+
+export function getComposition(id: string): AnyComposition | undefined {
+  return compositions.find((composition) => composition.id === id);
+}
+```
+
+## 2. Work out the props and size
+
+`resolveComposition` merges the input props over the defaults and applies `calculateMetadata`, so a composition can change its own length from its props. `decodeProps` reads the `?props=` query parameter. Turn a missing composition or bad input into an HTTP error, so the renderer can show the reason.
+
+```ts title="src/lib/compositions/load.ts"
+import { decodeProps, resolveComposition } from '@svelteframe/core';
+import { error } from '@sveltejs/kit';
+import { compositions, getComposition } from './index.js';
+
+export async function loadComposition(id: string, url: URL) {
+  const composition = getComposition(id);
+  if (!composition) {
+    const known = compositions.map((c) => c.id).join(', ');
+    error(404, `Unknown composition "${id}". Available: ${known}`);
+  }
+
+  let input: Record<string, unknown> | undefined;
+  const encoded = url.searchParams.get('props');
+  if (encoded) {
+    try {
+      input = decodeProps(encoded);
+    } catch (err) {
+      error(400, `Invalid ?props: ${(err as Error).message}`);
+    }
+  }
+
+  const { props, metadata } = await resolveComposition(composition, input);
+  return { id, props, metadata };
+}
+```
+
+## 3. The render route
+
+This page shows the composition at its full size and nothing else. It must run in the browser only (`ssr = false`), because the renderer drives it through `window`.
+
+```ts title="src/routes/render/[id]/+page.ts"
+import { loadComposition } from '$lib/compositions/load.js';
+
+export const ssr = false;
+export const load = ({ params, url }) => loadComposition(params.id, url);
+```
+
+```svelte title="src/routes/render/[id]/+page.svelte"
+<script lang="ts">
+  import { Composition, VideoState } from '@svelteframe/core';
+  import { onMount } from 'svelte';
+  import { exposeBridge } from '$lib/bridge.js';
+  import { getComposition } from '$lib/compositions/index.js';
+
+  let { data } = $props();
+
+  const { id, props: inputProps, metadata } = data;
+  const Root = getComposition(id)!.component;
+  const video = new VideoState(metadata);
+
+  onMount(() => exposeBridge(video, metadata));
+</script>
+
+<Composition {video} mode="render">
+  <Root {...inputProps} />
+</Composition>
+
+<style>
+  :global(body) {
+    margin: 0;
+    overflow: hidden;
+  }
+</style>
+```
+
+`mode="render"` matters: in a render, `<Audio>` records what it would play for the renderer to mix, `<OffthreadVideo>` asks the renderer for exact frames, and nothing is played aloud. The default, `preview`, is for people.
+
+## 4. The bridge
+
+The renderer sets the browser window to the video's size, loads the page, waits for `window.__Svelteframe`, and then calls `setFrame(n)` for each frame.
+
+```ts title="src/lib/bridge.ts"
+import { getAudioManifest, waitUntilReady, type VideoState } from '@svelteframe/core';
+import { tick } from 'svelte';
+
+export function exposeBridge(video: VideoState, config: SvelteframeBridge['config']): () => void {
+  window.__Svelteframe = {
+    config,
+    ready: true,
+    async setFrame(n) {
+      video.frame = n;
+      await tick();
+      await waitUntilReady();
+    },
+    // What <Audio> recorded; the renderer reads it after the last frame and mixes the sound.
+    get audio() {
+      return getAudioManifest();
+    }
+  };
+
+  return () => {
+    delete window.__Svelteframe;
+  };
+}
+```
+
+| Member | Meaning |
+| --- | --- |
+| `config` | `{ fps, width, height, durationInFrames }` of this render, after `calculateMetadata`. |
+| `ready` | `true` once the page can be driven. |
+| `setFrame(n)` | Shows frame `n`. It must resolve **only when the screen is ready to capture**: the DOM shows frame `n`, every [`delayRender`](/concepts/async-data/) handle has been released, and fonts have loaded. `waitUntilReady()` does the last two. |
+| `audio` | The sound segments `<Audio>` recorded, read once after the last frame. Optional: leave it out if the project has no sound. |
+
+## 5. Failures the renderer can read
+
+If the page cannot work, for example the id is unknown or the props are invalid, set `window.__SvelteframeError` to the reason instead of leaving the renderer waiting for a bridge that never appears. SvelteKit's error page is a good place:
+
+```svelte title="src/routes/+error.svelte"
+<script lang="ts">
+  import { page } from '$app/state';
+  import { onMount } from 'svelte';
+
+  onMount(() => {
+    window.__SvelteframeError = page.error?.message ?? `HTTP ${page.status}`;
+  });
+</script>
+```
+
+The renderer then fails with `<url> failed to load: <reason>`.
+
+## 6. Types for the globals
+
+```ts title="src/app.d.ts"
+declare global {
+  interface SvelteframeBridge {
+    config: { fps: number; width: number; height: number; durationInFrames: number };
+    ready: boolean;
+    setFrame(n: number): Promise<void>;
+    readonly audio?: readonly unknown[];
+  }
+
+  interface Window {
+    __Svelteframe?: SvelteframeBridge;
+    __SvelteframeError?: string;
+  }
+}
+
+export {};
+```
+
+## 7. A preview route (for people)
+
+```svelte title="src/routes/preview/[id]/+page.svelte"
+<script lang="ts">
+  import { Player } from '@svelteframe/core';
+  import { getComposition } from '$lib/compositions/index.js';
+
+  let { data } = $props();
+  const Root = $derived(getComposition(data.id)!.component);
+</script>
+
+<Player component={Root} inputProps={data.props} {...data.metadata} />
+```
+
+The `Player` is covered in [The Player](/concepts/player/).
+
+## 8. The composition list (optional)
+
+`svelteframe compositions` reads a JSON listing. Serve it from `/svelteframe/compositions.json` with `describeCompositions`:
+
+```ts title="src/routes/svelteframe/compositions.json/+server.ts"
+import { describeCompositions } from '@svelteframe/core';
+import { json } from '@sveltejs/kit';
+import { compositions } from '$lib/compositions/index.js';
+
+export const GET = () => json(describeCompositions(compositions));
+```
+
+Without it, `render` and `still` still work: they only need the render page.
+
+<Aside title="Not using SvelteKit?" type="tip">
+  Nothing here is SvelteKit-specific. Any page at `<base url>/render/<id>` that provides the bridge works, and you point the command at it with `--url`. The `svelteframe` command only knows how to build and serve a Vite project for you, which is why SvelteKit is the easiest path. See [The command line](/rendering/cli/#using-a-server-that-is-already-running).
+</Aside>

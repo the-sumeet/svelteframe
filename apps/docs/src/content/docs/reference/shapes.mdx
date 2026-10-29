@@ -1,0 +1,237 @@
+---
+title: "@svelteframe/shapes"
+description: "Every component, function and type exported by @svelteframe/shapes."
+sidebar:
+  order: 3
+---
+
+```ts
+import { Arrow, Canvas, Circle, Ellipse, Line, Polygon, Rect, Star, Triangle } from '@svelteframe/shapes';
+```
+
+The guide is [Shapes](/concepts/shapes/). `@svelteframe/shapes` needs `@svelteframe/core` (it reads the video's size from it).
+
+## Components
+
+### `Canvas`
+
+An `<svg>` the size of the composition, in which shapes are placed in video pixels with the origin at the top-left. It fills its nearest positioned parent.
+
+| Prop | Type | |
+| --- | --- | --- |
+| `class` | `string` | |
+| `style` | `string` | Appended to `position:absolute;inset:0;`. |
+| `children` | `Snippet` | |
+
+### `ShapeProps`
+
+Props every shape takes.
+
+| Prop | Type | Default | |
+| --- | --- | --- | --- |
+| `id` | `string` | | A name for lines and arrows to attach to. Unique in the `Canvas`; no dots or spaces; read once. |
+| `x`, `y` | `number` | `0` | Where the `anchor` goes. In a `Canvas` only. |
+| `anchor` | `Anchor \| Point` | `'top-left'` | Which point of the shape's box `x` and `y` place. |
+| `rotate` | `number` | `0` | Degrees, clockwise. |
+| `scale` | `number \| [number, number]` | `1` | |
+| `origin` | `Anchor \| Point` | `'center'` | What `rotate` and `scale` turn around. |
+| `fill` | `string` | SVG's default | |
+| `stroke` | `string` | none | |
+| `strokeWidth` | `number` | | |
+| `strokeLinecap` | `'butt' \| 'round' \| 'square'` | | |
+| `strokeLinejoin` | `'miter' \| 'round' \| 'bevel'` | | |
+| `opacity` | `number` | | |
+| `progress` | `number` | | Draw only this much of the outline, 0 to 1. The fill is unaffected. |
+| `class`, `style` | `string` | | |
+
+### `Rect`
+
+`ShapeProps` plus:
+
+| Prop | Type | Default | |
+| --- | --- | --- | --- |
+| `width` | `number` | required | 0 or more. |
+| `height` | `number` | required | 0 or more. |
+| `radius` | `number` | `0` | Corner radius, limited to half the shorter side. |
+
+### `Circle`
+
+`ShapeProps` plus `radius: number` (0 or more). Its box is the square around it, so `anchor="center"` is its centre.
+
+### `Ellipse`
+
+`ShapeProps` plus `rx: number` and `ry: number` (the horizontal and vertical radii, 0 or more).
+
+### `Triangle`
+
+`ShapeProps` plus `width` and `height`. It points up, with its base along the bottom of the box. `strokeLinejoin` defaults to `'round'`.
+
+### `Polygon`
+
+`ShapeProps` plus:
+
+| Prop | Type | |
+| --- | --- | --- |
+| `sides` | `number` | A whole number, 3 or more. |
+| `radius` | `number` | Distance from the centre to a corner. One corner points up. |
+
+Its box is `2 × radius` square, centred on the polygon. `strokeLinejoin` defaults to `'round'`.
+
+### `Star`
+
+`ShapeProps` plus:
+
+| Prop | Type | Default | |
+| --- | --- | --- | --- |
+| `points` | `number` | `5` | A whole number, 3 or more. |
+| `outerRadius` | `number` | required | Centre to tips. One tip points up. |
+| `innerRadius` | `number` | `0.4 × outerRadius` | Centre to notches. |
+
+### `Line`
+
+`ShapeProps` without `x`, `y`, `anchor` and `fill`, plus:
+
+| Prop | Type | Default | |
+| --- | --- | --- | --- |
+| `from` | `End` | required | A point, or a shape by id. |
+| `to` | `End` | required | |
+| `gap` | `number` | `0` | Space between an end and the shape it is attached to. |
+
+`stroke` defaults to `'currentColor'`, `strokeWidth` to `4`, and `progress` to `1` (the line grows from `from`).
+
+### `Arrow`
+
+`Line`'s props, plus:
+
+| Prop | Type | Default | |
+| --- | --- | --- | --- |
+| `heads` | `ArrowHeads` | `'end'` | Which ends get a head. |
+| `headLength` | `number` | `4 × strokeWidth` | Along the line. |
+| `headWidth` | `number` | `0.8 × headLength` | Across the line. |
+
+`strokeLinejoin` defaults to `'round'`. The head is filled with the stroke colour.
+
+## Ends of lines and arrows
+
+### `End`
+
+What `from` and `to` accept:
+
+- a `Point`: `[x, y]` on the canvas;
+- `"id"`: the edge of the shape facing the other end;
+- `"id.anchor"`: that point of the shape's box;
+- `{ id, anchor?, dx?, dy? }`: the same, moved by `dx` and `dy` pixels.
+
+### `parseEnd`
+
+```ts
+function parseEnd(end: End): { kind: 'point'; point: Point } | { kind: 'shape'; id: string; anchor?: Anchor; dx: number; dy: number }
+```
+
+Reads an `End`. Throws, listing the valid anchors, for an unknown anchor, and for anything that is not an end.
+
+### `resolveEnds`
+
+```ts
+function resolveEnds(from: End, to: End, options: { find: (id: string) => ShapeGeometry | undefined; gap?: number }): ResolvedEnds
+```
+
+Turns the two ends into points on the canvas, using `find` to look shapes up. This is what `Line` and `Arrow` do.
+
+### `ResolvedEnds`
+
+`{ points?: [Point, Point]; missing: string[] }`. `points` is `undefined` while a named shape is missing, and `missing` lists the ids that no shape has.
+
+### `ShapeGeometry`
+
+What the `Canvas` knows about a shape that has an `id`: its box (`width`, `height`), its `outline`, and its `placement` (`x`, `y`, `anchor`, `rotate`, `scale`, `origin`).
+
+### `Outline`
+
+The shape of a shape's edge, in its own coordinates: `{ kind: 'box' }`, `{ kind: 'ellipse' }` (the ellipse that fills the box) or `{ kind: 'polygon'; points }`.
+
+### `shapeAnchorPoint`
+
+```ts
+function shapeAnchorPoint(shape: ShapeGeometry, anchor: Anchor): Point
+```
+
+A point of the shape's box, on the canvas, with rotation and scale applied.
+
+### `boundaryToward`
+
+```ts
+function boundaryToward(shape: ShapeGeometry, target: Point): Point
+```
+
+Where the line from the shape's centre towards `target` leaves its outline. When the target is inside the shape, the centre is returned.
+
+### `ANCHORS`
+
+The nine anchor names: `'top-left'`, `'top'`, `'top-right'`, `'left'`, `'center'`, `'right'`, `'bottom-left'`, `'bottom'`, `'bottom-right'`.
+
+## Geometry
+
+### `Point`
+
+`readonly [x: number, y: number]`.
+
+### `Anchor`
+
+One of the names in `ANCHORS`.
+
+### `anchorPoint`
+
+```ts
+function anchorPoint(anchor: Anchor | Point, width: number, height: number): Point
+```
+
+Where an anchor is in a box of this size, measured from its top-left corner. A `Point` is returned as it is.
+
+### `shapeTransform`
+
+```ts
+function shapeTransform(options: TransformOptions): string
+```
+
+The SVG `transform` that puts a shape's box where it belongs: the `anchor` at `x`, `y`, then rotated and scaled around `origin`. An empty string when nothing needs to move.
+
+### `TransformOptions`
+
+`{ x?, y?, width, height, anchor?, rotate?, scale?, origin? }`, as for the shape props.
+
+### `regularPolygon`
+
+```ts
+function regularPolygon(sides: number, radius: number): Point[]
+```
+
+The corners of a regular polygon with one corner up, in a box of `2 × radius` centred at `(radius, radius)`.
+
+### `star`
+
+```ts
+function star(points: number, outerRadius: number, innerRadius: number): Point[]
+```
+
+The vertices of a star with a tip up, in a box of `2 × outerRadius`, tips and notches alternating.
+
+### `arrowGeometry`
+
+```ts
+function arrowGeometry(from: Point, to: Point, options: ArrowOptions): ArrowGeometry
+```
+
+The parts of an arrow: its shaft and its heads. The head sits on the end of what is drawn so far and is shortened to fit while the arrow is short, so an arrow can grow from nothing.
+
+### `ArrowOptions`
+
+`{ progress?, strokeWidth, headLength?, headWidth?, heads? }`.
+
+### `ArrowGeometry`
+
+`{ shaft?: [Point, Point]; heads: Point[][] }`. `shaft` is `undefined` when it has no length, and each head is a triangle, tip first.
+
+### `ArrowHeads`
+
+`'end' | 'start' | 'both' | 'none'`.

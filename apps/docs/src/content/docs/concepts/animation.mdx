@@ -1,0 +1,90 @@
+---
+title: "Animation"
+description: "Map frames to values with interpolate, shape them with Easing, and add motion with spring."
+sidebar:
+  order: 3
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Demo from '~/components/Demo.svelte';
+
+Animating is turning a frame number into a value: an opacity, a position, a scale. Svelteframe has three small tools for it, and all are plain functions.
+
+## interpolate
+
+`interpolate(input, inputRange, outputRange, options?)` maps `input` from one range onto another, in a straight line.
+
+```ts
+// At frame 0 the opacity is 0; at frame 30 it is 1.
+interpolate(frame, [0, 30], [0, 1]);
+
+// With more points it is piecewise: up, then down.
+interpolate(frame, [0, 10, 20], [0, 1, 0]);
+
+// Any numbers work: move from x = -120 to x = 0.
+interpolate(frame, [0, 30], [-120, 0]);
+```
+
+Both ranges need the same number of points (at least two), and the input range must be strictly increasing.
+
+### Outside the range
+
+By default the output **clamps**: before the first input it is the first output, and after the last it is the last. Change that per side with `extrapolateLeft` and `extrapolateRight`:
+
+| Value | Outside the range the result is... |
+| --- | --- |
+| `'clamp'` (default) | the nearest end of the output range |
+| `'extend'` | the line, continued |
+| `'identity'` | the input itself |
+
+```ts
+// Keeps moving after frame 30, at the same speed.
+interpolate(frame, [0, 30], [0, 300], { extrapolateRight: 'extend' });
+```
+
+### Easing
+
+Pass an `easing` function to bend the progress inside each segment. `Easing` has the usual ones:
+
+| Easing | What it does |
+| --- | --- |
+| `Easing.linear` | Constant speed (the default). |
+| `Easing.ease` | CSS `ease`. |
+| `Easing.quad`, `Easing.cubic` | Start slowly, then speed up. |
+| `Easing.bezier(x1, y1, x2, y2)` | Any CSS `cubic-bezier()`. `x1` and `x2` must be between 0 and 1. |
+| `Easing.in(fn)` | `fn` as it is (ease in). |
+| `Easing.out(fn)` | `fn` mirrored, so it starts fast and slows down. |
+| `Easing.inOut(fn)` | In for the first half, out for the second. |
+
+```ts
+interpolate(frame, [0, 30], [0, 1], { easing: Easing.out(Easing.cubic) });
+```
+
+<Demo name="easings" client:only="svelte" />
+
+## spring
+
+`spring` gives natural motion: it overshoots its target and settles, like a weight on a spring. It is a closed-form solution, so, like everything else, it is a pure function of the frame: any frame can be computed on its own.
+
+```ts
+const scale = spring({ frame, fps, config: { damping: 12 } });
+```
+
+It returns `0` at frame 0 and settles on `1`. To start later, subtract: `spring({ frame: frame - 20, fps })` stays at `0` until frame 20.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `frame`, `fps` | required | Where in time we are. |
+| `config.damping` | `10` | Higher means less bounce. `0` never settles. |
+| `config.stiffness` | `100` | Higher means faster. |
+| `config.mass` | `1` | Higher means slower and heavier. |
+| `from`, `to` | `0`, `1` | The start and end values. |
+| `durationInFrames` | none | Stretch the motion so it settles exactly at this frame. |
+
+<Demo name="spring-bounce" client:only="svelte" />
+
+`measureSpring({ fps, config })` tells you after how many frames a spring has settled (within a small threshold, capped at 60 seconds), which is handy for sizing a [`Sequence`](/concepts/timeline/) around it.
+
+<Aside type="caution" title="Do not use Svelte's own animation tools">
+  `transition:`, `animate:`, `tweened` and `spring` from `svelte/motion`, CSS animations and CSS transitions all run on the **wall clock**, so they cannot be captured frame by frame. Use `interpolate` and `spring` from `@svelteframe/core`. See [Determinism](/concepts/determinism/).
+</Aside>

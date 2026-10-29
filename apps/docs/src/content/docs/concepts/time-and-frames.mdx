@@ -1,0 +1,66 @@
+---
+title: "Time and frames"
+description: "A video is a pure function of the frame number, and useVideo is how a component reads it."
+sidebar:
+  order: 1
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import Demo from '~/components/Demo.svelte';
+
+A video is a list of still images shown one after another. Svelteframe's one big idea is that **every image is a pure function of its frame number**: give the same composition the same frame, and you get the same picture. Nothing else (the clock, a random number, how long the last frame took) is allowed to influence it.
+
+That makes rendering simple and safe. The renderer can show frame 500 without showing the 499 before it, split the video across several browser pages, and render again tomorrow with an identical result.
+
+## Reading the frame
+
+Inside a composition, `useVideo()` returns the video's facts and the current frame:
+
+```svelte
+<script lang="ts">
+  import { interpolate, useVideo } from '@svelteframe/core';
+
+  const video = useVideo();
+  const opacity = $derived(interpolate(video.frame, [0, 30], [0, 1]));
+</script>
+
+<div style="opacity:{opacity}">frame {video.frame}</div>
+```
+
+<Demo name="fade-in" client:only="svelte" />
+
+| Field | Meaning |
+| --- | --- |
+| `frame` | The current frame, starting at `0`. Inside a [`Sequence`](/concepts/timeline/) it counts from that sequence's start. Reactive. |
+| `absoluteFrame` | The composition's own frame, whatever `Sequence`, `Loop` or `Freeze` do to `frame`. |
+| `fps` | Frames per second. |
+| `width`, `height` | The size of the video in pixels. |
+| `durationInFrames` | How many frames the video has. The last frame is `durationInFrames - 1`. Inside a `Loop` it is the loop's length. |
+
+`useVideo()` throws if it is called outside a composition, that is, outside a [`Player`](/concepts/player/) or a `Composition`.
+
+## Frames and seconds
+
+You think in seconds, the video counts in frames. Convert with `fps`:
+
+```ts
+const seconds = video.frame / video.fps;
+const frameAtTwoSeconds = 2 * video.fps;
+const fiveSecondVideo = 5 * 30; // durationInFrames at 30 fps
+```
+
+## Layout is in video pixels
+
+A composition is laid out at its real size, for example 1920 × 1080, with ordinary CSS. The `Player` scales the whole thing down to fit the page, and the renderer captures it at full size. So you never write "responsive" code: `font-size: 120px` means 120 pixels of video.
+
+[`AbsoluteFill`](/reference/core-components/#absolutefill) is a convenient full-size box:
+
+```svelte
+<AbsoluteFill style="background:#0f1722;align-items:center;justify-content:center">
+  <h1>Centered</h1>
+</AbsoluteFill>
+```
+
+<Aside title="Derive, do not accumulate">
+  Compute what you draw from `video.frame` every time, with `$derived`. Do not keep a counter that you increment: frames can be shown in any order (scrubbing, parallel rendering), and an accumulated value will be wrong. See [Determinism](/concepts/determinism/).
+</Aside>
