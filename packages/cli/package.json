@@ -21,6 +21,7 @@
     "test": "tsx --test src/*.test.ts"
   },
   "dependencies": {
+    "@svelteframe/core": "workspace:^",
     "@svelteframe/renderer": "workspace:^"
   },
   "devDependencies": {

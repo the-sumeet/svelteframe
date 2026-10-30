@@ -240,6 +240,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@svelteframe/core':
+        specifier: workspace:^
+        version: link:../core
       '@svelteframe/renderer':
         specifier: workspace:^
         version: link:../renderer

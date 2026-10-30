@@ -7,6 +7,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { format } from 'node:util';
+import { findCompositionsFile } from './discover.js';
+import { svelteframeVitePlugin } from './plugin.js';
 
 export interface ProjectServer {
 	/** Where the project is being served, e.g. `http://127.0.0.1:53887/`. */
@@ -19,6 +21,10 @@ export interface StartOptions {
 	root: string;
 	/** Start the dev server instead of building the project and previewing the build. */
 	dev?: boolean;
+	/** Port to listen on (optional; defaults to a free port). */
+	port?: number;
+	/** Custom path to the compositions file. */
+	config?: string;
 	/** Show Vite's own output. */
 	verbose?: boolean;
 	onStatus?: (message: string) => void;
@@ -149,9 +155,8 @@ export function getFreePort(): Promise<number> {
  * Serve the project with its own Vite: `vite build` then `vite preview` by default, which is
  * steady and what you ship, or the dev server with `dev`. Returns once it answers.
  *
- * The working directory moves to the project while it runs, as it would if you had run Vite
- * there; server routes that read files relative to it depend on that. `close()` moves it back.
- * Building and previewing take turns between commands (see `acquireBuildLock`).
+ * If the project does not have custom `/render/[id]` routes, the Svelteframe virtual harness plugin
+ * is automatically injected into the dev server so compositions can render with zero boilerplate.
  */
 export async function startProjectServer(options: StartOptions): Promise<ProjectServer> {
 	const root = resolve(options.root);
@@ -160,18 +165,33 @@ export async function startProjectServer(options: StartOptions): Promise<Project
 	}
 
 	const vite = await loadProjectVite(root);
-	const port = await getFreePort();
+	const port = options.port ?? (await getFreePort());
 	const logLevel = options.verbose ? 'info' : 'warn';
 	const host = '127.0.0.1';
 
-	const releaseLock = options.dev ? async () => {} : await acquireBuildLock(root, options);
+	const compositionsFile = findCompositionsFile(root, options.config);
+	const hasCustomRenderRoute = existsSync(join(root, 'src/routes/render/[id]'));
+	const useDevServer = Boolean(options.dev || !hasCustomRenderRoute);
+
+	const plugins: any[] = [];
+	if (compositionsFile) {
+		plugins.push(svelteframeVitePlugin({ compositionsFile }));
+	}
+
+	const releaseLock = useDevServer ? async () => {} : await acquireBuildLock(root, options);
 	const previousDirectory = process.cwd();
 	process.chdir(root);
 	try {
 		let server: ViteServer;
-		if (options.dev) {
+		if (useDevServer) {
 			options.onStatus?.('Starting the dev server...');
-			const dev = await vite.createServer({ root, logLevel, server: { host, port, strictPort: true } });
+			const dev = await vite.createServer({
+				root,
+				logLevel,
+				server: { host, port, strictPort: true },
+				plugins,
+				ssr: { noExternal: [/^@svelteframe\//] }
+			});
 			await dev.listen();
 			server = dev;
 		} else {

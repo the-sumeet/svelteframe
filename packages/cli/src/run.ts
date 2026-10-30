@@ -8,6 +8,7 @@ import {
 } from '@svelteframe/renderer';
 import type { Command } from './args.js';
 import { formatListing, parseListing } from './format.js';
+import { initProject } from './init.js';
 import { startProjectServer } from './server.js';
 
 export interface Io {
@@ -24,12 +25,13 @@ export interface Io {
 type Served = Exclude<Command, { name: 'help' } | { name: 'version' }>;
 
 /** Run `work` against the project's server: the one at `--url`, or one started for the occasion. */
-async function withProject<T>(command: Served, io: Io, work: (baseUrl: string) => Promise<T>): Promise<T> {
+async function withProject<T>(command: Extract<Served, { root?: string; url?: string; dev: boolean; config?: string }>, io: Io, work: (baseUrl: string) => Promise<T>): Promise<T> {
 	if (command.url !== undefined) return work(command.url);
 
 	const server = await startProjectServer({
 		root: resolve(io.cwd, command.root ?? '.'),
 		dev: command.dev,
+		config: command.config,
 		verbose: io.verbose,
 		signal: io.signal,
 		onStatus: (message) => io.stderr.write(`${message}\n`)
@@ -99,7 +101,7 @@ async function compositions(command: Extract<Command, { name: 'compositions' }>,
 		if (!response.ok) {
 			throw new Error(
 				`${endpoint} answered ${response.status}. The project needs a route at /svelteframe/compositions.json ` +
-					'that returns describeCompositions(compositions) from @svelteframe/core.'
+					'or a compositions file (e.g. src/compositions.ts) that exports defineComposition() entries.'
 			);
 		}
 		try {
@@ -112,6 +114,37 @@ async function compositions(command: Extract<Command, { name: 'compositions' }>,
 	io.stdout.write(command.json ? `${JSON.stringify(listing, null, 2)}\n` : `${formatListing(listing)}\n`);
 }
 
+async function dev(command: Extract<Command, { name: 'dev' }>, io: Io): Promise<void> {
+	const server = await startProjectServer({
+		root: resolve(io.cwd, command.root ?? '.'),
+		dev: true,
+		port: command.port,
+		config: command.config,
+		verbose: io.verbose,
+		signal: io.signal,
+		onStatus: (message) => io.stderr.write(`${message}\n`)
+	});
+
+	io.stdout.write(`\n  🎬 Svelteframe Studio running at:\n  ➜ ${server.url}\n\n`);
+
+	await new Promise<void>((resolvePromise) => {
+		if (io.signal.aborted) {
+			resolvePromise();
+			return;
+		}
+		io.signal.addEventListener('abort', () => resolvePromise(), { once: true });
+	});
+
+	await server.close();
+}
+
+async function init(command: Extract<Command, { name: 'init' }>, io: Io): Promise<void> {
+	await initProject({
+		root: resolve(io.cwd, command.root ?? '.'),
+		onLog: (message) => io.stdout.write(`${message}\n`)
+	});
+}
+
 /** Run a command that talks to the project. Rejects with the reason when it fails. */
 export async function run(command: Served, io: Io): Promise<void> {
 	switch (command.name) {
@@ -121,5 +154,9 @@ export async function run(command: Served, io: Io): Promise<void> {
 			return still(command, io);
 		case 'compositions':
 			return compositions(command, io);
+		case 'dev':
+			return dev(command, io);
+		case 'init':
+			return init(command, io);
 	}
 }

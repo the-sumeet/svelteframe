@@ -19,9 +19,63 @@ describe('help and version', () => {
 	});
 
 	it('documents every command and option', () => {
-		for (const word of ['render', 'still', 'compositions', '--root', '--url', '--dev', '--out', '--props', '--concurrency', '--quality', '--png', '--frame', '--json']) {
+		for (const word of [
+			'render',
+			'still',
+			'compositions',
+			'dev',
+			'init',
+			'--root',
+			'--config',
+			'--url',
+			'--dev',
+			'--out',
+			'--props',
+			'--concurrency',
+			'--quality',
+			'--png',
+			'--frame',
+			'--json'
+		]) {
 			assert.ok(HELP.includes(word), word);
 		}
+	});
+});
+
+describe('init', () => {
+	it('parses init with default root or given root', () => {
+		assert.deepEqual(parseCommand(['init']), { name: 'init', root: undefined });
+		assert.deepEqual(parseCommand(['init', '--root', 'my-app']), { name: 'init', root: 'my-app' });
+	});
+
+	it('rejects extra arguments to init', () => {
+		usage(['init', 'something'], /"init" takes no arguments, got "something"/);
+	});
+});
+
+describe('dev', () => {
+	it('parses dev command', () => {
+		assert.deepEqual(parseCommand(['dev']), {
+			name: 'dev',
+			root: undefined,
+			url: undefined,
+			dev: true,
+			config: undefined,
+			chromium: undefined,
+			port: undefined
+		});
+	});
+
+	it('parses dev with custom port and root', () => {
+		assert.deepEqual(parseCommand(['dev', '--port', '3000', '--root', 'sub']), {
+			name: 'dev',
+			root: 'sub',
+			url: undefined,
+			dev: true,
+			config: undefined,
+			chromium: undefined,
+			port: 3000
+		});
 	});
 });
 
@@ -38,6 +92,7 @@ describe('render', () => {
 			root: undefined,
 			url: undefined,
 			dev: false,
+			config: undefined,
 			chromium: undefined
 		});
 	});
@@ -45,7 +100,8 @@ describe('render', () => {
 	it('reads every option, in any position', () => {
 		const command = parseCommand([
 			'--root', 'apps/site', 'render', '--out', 'out/video.mp4', 'title-card', '--props', 'p.json',
-			'--concurrency', '6', '--quality', '75', '--png', '--dev', '--chromium', '/usr/bin/chromium'
+			'--concurrency', '6', '--quality', '75', '--png', '--dev', '--chromium', '/usr/bin/chromium',
+			'--config', 'src/my-comp.ts'
 		]);
 		assert.deepEqual(command, {
 			name: 'render',
@@ -58,6 +114,7 @@ describe('render', () => {
 			root: 'apps/site',
 			url: undefined,
 			dev: true,
+			config: 'src/my-comp.ts',
 			chromium: '/usr/bin/chromium'
 		});
 	});
@@ -98,6 +155,7 @@ describe('still', () => {
 			root: undefined,
 			url: undefined,
 			dev: false,
+			config: undefined,
 			chromium: undefined
 		});
 	});
@@ -106,7 +164,7 @@ describe('still', () => {
 		const command = parseCommand(['still', 'main', '--frame', '45', '--out', 'frame.jpg', '--props', 'p.json', '--quality', '80']);
 		assert.deepEqual(
 			{ ...command },
-			{ name: 'still', id: 'main', frame: 45, out: 'frame.jpg', props: 'p.json', quality: 80, root: undefined, url: undefined, dev: false, chromium: undefined }
+			{ name: 'still', id: 'main', frame: 45, out: 'frame.jpg', props: 'p.json', quality: 80, root: undefined, url: undefined, dev: false, config: undefined, chromium: undefined }
 		);
 	});
 
@@ -153,7 +211,7 @@ describe('shared options', () => {
 
 describe('mistakes', () => {
 	it('names an unknown command and lists the real ones', () => {
-		usage(['bogus'], /Unknown command "bogus". Commands: render, still, compositions/);
+		usage(['bogus'], /Unknown command "bogus". Commands: render, dev, still, compositions, init/);
 	});
 
 	it('names an unknown option', () => {

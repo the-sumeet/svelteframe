@@ -9,6 +9,7 @@ export {
 	type AudioSegment,
 	type Observation
 } from './audio.js';
+export { exposeBridge, type SvelteframeBridge } from './bridge.js';
 export { default as Composition } from './Composition.svelte';
 export {
 	defineComposition,
@@ -27,6 +28,7 @@ export { default as Img } from './Img.svelte';
 export { default as Loop } from './Loop.svelte';
 export { default as OffthreadVideo } from './OffthreadVideo.svelte';
 export { default as Player } from './Player.svelte';
+export { default as RenderHarness } from './RenderHarness.svelte';
 export { default as Sequence } from './Sequence.svelte';
 export { default as Series } from './Series.svelte';
 export { default as SeriesItem } from './SeriesItem.svelte';

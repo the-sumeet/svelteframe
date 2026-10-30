@@ -9,14 +9,20 @@ export const HELP = `svelteframe: render videos made with Svelteframe
 
 Usage:
   svelteframe render <id> [options]        Render a composition to a video
+  svelteframe dev [options]                Start the studio preview in your browser
   svelteframe still <id> [options]         Capture one frame as an image
   svelteframe compositions [options]       List the project's compositions
+  svelteframe init [options]               Set up Svelteframe in a project
 
 Common options:
   --root <dir>          the project (default: the current directory)
+  --config <file>       path to compositions file (default: auto-detected)
   --url <base url>      use a server that is already running instead of starting one
   --dev                 start the dev server instead of building and previewing the project
   --chromium <path>     Chromium executable to use
+
+dev options:
+  --port <number>       port to serve on
 
 render options:
   --out <file>          output video (default <id>.mp4)
@@ -42,12 +48,15 @@ interface Shared {
 	root?: string;
 	url?: string;
 	dev: boolean;
+	config?: string;
 	chromium?: string;
 }
 
 export type Command =
 	| { name: 'help' }
 	| { name: 'version' }
+	| { name: 'init'; root?: string }
+	| (Shared & { name: 'dev'; port?: number })
 	| (Shared & {
 			name: 'render';
 			id: string;
@@ -71,7 +80,9 @@ const OPTIONS = {
 	root: { type: 'string' },
 	url: { type: 'string' },
 	dev: { type: 'boolean' },
+	config: { type: 'string' },
 	chromium: { type: 'string' },
+	port: { type: 'string' },
 	out: { type: 'string' },
 	props: { type: 'string' },
 	concurrency: { type: 'string' },
@@ -85,11 +96,13 @@ const OPTIONS = {
 
 type OptionName = keyof typeof OPTIONS;
 
-const SHARED: OptionName[] = ['root', 'url', 'dev', 'chromium'];
-const ALLOWED: Record<'render' | 'still' | 'compositions', OptionName[]> = {
+const SHARED: OptionName[] = ['root', 'url', 'dev', 'config', 'chromium'];
+const ALLOWED: Record<'render' | 'still' | 'compositions' | 'dev' | 'init', OptionName[]> = {
 	render: [...SHARED, 'out', 'props', 'concurrency', 'quality', 'png'],
 	still: [...SHARED, 'out', 'props', 'frame', 'quality'],
-	compositions: [...SHARED, 'json']
+	compositions: [...SHARED, 'json'],
+	dev: [...SHARED, 'port'],
+	init: ['root']
 };
 
 function whole(value: string, flag: string, min: number): number {
@@ -130,8 +143,8 @@ export function parseCommand(argv: string[]): Command {
 
 	const [name, ...rest] = positionals;
 	if (name === undefined) return { name: 'help' };
-	if (name !== 'render' && name !== 'still' && name !== 'compositions') {
-		throw new UsageError(`Unknown command "${name}". Commands: render, still, compositions`);
+	if (name !== 'render' && name !== 'still' && name !== 'compositions' && name !== 'dev' && name !== 'init') {
+		throw new UsageError(`Unknown command "${name}". Commands: render, dev, still, compositions, init`);
 	}
 
 	for (const option of Object.keys(values) as OptionName[]) {
@@ -140,7 +153,19 @@ export function parseCommand(argv: string[]): Command {
 		}
 	}
 
-	const shared: Shared = { root: values.root, url: values.url, dev: values.dev ?? false, chromium: values.chromium };
+	if (name === 'init') {
+		if (rest.length > 0) throw new UsageError(`"init" takes no arguments, got "${rest[0]}"`);
+		return { name: 'init', root: values.root };
+	}
+
+	const shared: Shared = {
+		root: values.root,
+		url: values.url,
+		dev: values.dev ?? false,
+		config: values.config,
+		chromium: values.chromium
+	};
+
 	if (shared.url !== undefined) {
 		let protocol: string | undefined;
 		try {
@@ -152,6 +177,16 @@ export function parseCommand(argv: string[]): Command {
 			throw new UsageError(`--url must be a full URL such as http://localhost:5173, got "${shared.url}"`);
 		}
 		if (shared.dev) throw new UsageError('--dev has no effect with --url: no server is started');
+	}
+
+	if (name === 'dev') {
+		if (rest.length > 0) throw new UsageError(`"dev" takes no arguments, got "${rest[0]}"`);
+		return {
+			name: 'dev',
+			...shared,
+			dev: true,
+			port: values.port ? whole(values.port, '--port', 1) : undefined
+		};
 	}
 
 	if (name === 'compositions') {
